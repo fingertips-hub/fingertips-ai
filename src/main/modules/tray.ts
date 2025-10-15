@@ -1,5 +1,6 @@
 import { app, Tray, Menu, nativeImage } from 'electron'
 import icon from '../../../resources/icon.png?asset'
+import { showSettingsWindow } from './Settings'
 
 let tray: Tray | null = null
 
@@ -13,6 +14,15 @@ export function createTray(): void {
 
   // Create context menu
   const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '设置',
+      click: () => {
+        showSettingsWindow()
+      }
+    },
+    {
+      type: 'separator'
+    },
     {
       label: '退出',
       click: () => {

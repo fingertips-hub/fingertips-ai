@@ -6,8 +6,14 @@ import icon from '../../resources/icon.png?asset'
 // Import modules
 import { createTray } from './modules/tray'
 import { createSuperPanelWindow, showSuperPanelAtMouse } from './modules/superPanel'
+import { showSettingsWindow } from './modules/Settings'
 import { setupGlobalMouseListener, stopGlobalMouseListener } from './modules/mouseListener'
 import { setupSuperPanelHandlers, cleanupSuperPanelHandlers } from './modules/superPanelHandlers'
+import {
+  setupSettingsHandlers,
+  cleanupSettingsHandlers,
+  initializeDefaultHotkey
+} from './modules/settingsHandlers'
 
 // =============================================================================
 // 单实例锁定 - Single Instance Lock
@@ -47,6 +53,9 @@ app.commandLine.appendSwitch('disk-cache-size', '1')
 if (is.dev) {
   app.commandLine.appendSwitch('disable-gpu-shader-disk-cache')
 }
+
+// 禁用窗口动画
+app.commandLine.appendSwitch('wm-window-animations-disabled')
 
 /**
  * Create main window (optional, currently not used)
@@ -126,6 +135,12 @@ app.whenReady().then(() => {
   // Setup Super Panel IPC handlers
   setupSuperPanelHandlers()
 
+  // Setup Settings IPC handlers
+  setupSettingsHandlers()
+
+  // Initialize default hotkey
+  initializeDefaultHotkey()
+
   // Optional: createWindow() for main window if needed
   // createWindow()
 
@@ -138,6 +153,11 @@ app.whenReady().then(() => {
   // IPC handler for showing Super Panel (optional, for future use)
   ipcMain.on('show-super-panel', () => {
     showSuperPanelAtMouse()
+  })
+
+  // IPC handler for showing Settings window
+  ipcMain.on('show-settings', () => {
+    showSettingsWindow()
   })
 })
 
@@ -157,6 +177,9 @@ app.on('before-quit', () => {
 
   // Cleanup Super Panel IPC handlers
   cleanupSuperPanelHandlers()
+
+  // Cleanup Settings IPC handlers
+  cleanupSettingsHandlers()
 })
 
 // In this file you can include the rest of your app's specific main process

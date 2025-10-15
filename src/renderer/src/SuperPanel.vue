@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full select-none bg-transparent">
+  <div class="w-full h-full select-none rounded-lg bg-[#ebebeb]">
     <div
       ref="containerRef"
       class="w-full h-full select-none borderbox m-0 p-2 pt-1 rounded-lg flex flex-col"
@@ -14,14 +14,17 @@
         <div class="text-sm font-bold">Fingertips</div>
         <div class="flex gap-0 items-center">
           <button
-            class="px-2 py-1 cursor-pointer pointer-events-auto transition-colors"
+            class="px-2 py-1 cursor-pointer pointer-events-auto transition-colors outline-none"
             :class="{ 'text-blue-500': isPinned, 'text-gray-400 hover:text-gray-600': !isPinned }"
             :title="isPinned ? '取消固定' : '固定面板'"
             @click="handleTogglePin"
           >
             <Icon :icon="isPinned ? 'mdi:pin' : 'mdi:pin-off'" />
           </button>
-          <button class="px-2 py-1 cursor-pointer pointer-events-auto" @click="handleClose">
+          <button
+            class="px-2 py-1 cursor-pointer pointer-events-auto outline-none"
+            @click="handleClose"
+          >
             <Icon icon="mdi:close" />
           </button>
         </div>
@@ -151,14 +154,27 @@ const handleResetPinned = (): void => {
   console.log('Pin state reset from IPC event')
 }
 
-// 组件挂载时监听 IPC 事件
+/**
+ * 处理键盘按键事件
+ */
+const handleKeyDown = (event: KeyboardEvent): void => {
+  // 按下 ESC 键时隐藏窗口
+  if (event.key === 'Escape') {
+    event.preventDefault() // 防止默认行为
+    handleClose()
+  }
+}
+
+// 组件挂载时监听 IPC 事件和键盘事件
 onMounted(() => {
   window.electron.ipcRenderer.on('super-panel:reset-pinned', handleResetPinned)
+  window.addEventListener('keydown', handleKeyDown)
 })
 
 // 组件卸载时移除监听
 onUnmounted(() => {
   window.electron.ipcRenderer.removeListener('super-panel:reset-pinned', handleResetPinned)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 

@@ -5,7 +5,9 @@
       <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" @click="emit('back')">
         <Icon icon="mdi:arrow-left" class="text-xl text-gray-600" />
       </button>
-      <h2 class="text-lg font-semibold text-gray-800">添加网页链接</h2>
+      <h2 class="text-lg font-semibold text-gray-800">
+        {{ mode === 'edit' ? '编辑网页链接' : '添加网页链接' }}
+      </h2>
     </div>
 
     <!-- 主体区域 - 支持滚动 -->
@@ -101,16 +103,29 @@
         :disabled="!isValid"
         @click="handleConfirm"
       >
-        确认添加
+        {{ mode === 'edit' ? '确认保存' : '确认添加' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useToast } from '../../composables/useToast'
+
+interface Props {
+  mode?: 'add' | 'edit'
+  initialData?: {
+    url: string
+    name: string
+    icon: string
+  }
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'add'
+})
 
 const emit = defineEmits<{
   back: []
@@ -126,6 +141,23 @@ const urlError = ref('')
 const faviconUrl = ref<string | null>(null)
 const isFetchingFavicon = ref(false)
 let debounceTimer: number | null = null
+
+// 编辑模式下初始化数据
+onMounted(() => {
+  if (props.mode === 'edit' && props.initialData) {
+    url.value = props.initialData.url
+    displayName.value = props.initialData.name
+    // 如果icon是base64或URL，设置为faviconUrl
+    if (
+      props.initialData.icon.startsWith('data:') ||
+      props.initialData.icon.startsWith('http://') ||
+      props.initialData.icon.startsWith('https://')
+    ) {
+      faviconUrl.value = props.initialData.icon
+    }
+    // 如果是iconify图标，faviconUrl保持null（会显示对应的iconify图标）
+  }
+})
 
 /**
  * 验证URL格式

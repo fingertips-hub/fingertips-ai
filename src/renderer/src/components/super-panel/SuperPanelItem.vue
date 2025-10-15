@@ -1,8 +1,19 @@
 <template>
   <div
     class="w-full h-full flex flex-col items-center justify-center bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-all group relative"
+    :class="{
+      'opacity-50': isDragging,
+      'ring-2 ring-blue-400 ring-offset-1': isDropTarget,
+      'cursor-move': item && !modalVisible
+    }"
+    :draggable="!!item && !modalVisible"
     @click="handleClick"
     @contextmenu.prevent="handleContextMenu"
+    @dragstart="handleDragStart"
+    @dragover.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop.prevent="handleDrop"
+    @dragend="handleDragEnd"
   >
     <!-- 如果有应用,显示应用信息 -->
     <template v-if="item">
@@ -81,6 +92,12 @@
       <!-- 添加文件视图 -->
       <AddFileView
         v-else-if="currentView === 'add-file'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'file'
+            ? { fileInfo: { name: item.name, path: item.path, extension: '' }, icon: item.icon }
+            : undefined
+        "
         @back="handleBack"
         @confirm="handleFileConfirm"
       />
@@ -88,6 +105,12 @@
       <!-- 添加文件夹视图 -->
       <AddFolderView
         v-else-if="currentView === 'add-folder'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'folder'
+            ? { folderInfo: { name: item.name, path: item.path, extension: '' }, icon: item.icon }
+            : undefined
+        "
         @back="handleBack"
         @confirm="handleFolderConfirm"
       />
@@ -95,6 +118,12 @@
       <!-- 添加网页视图 -->
       <AddWebView
         v-else-if="currentView === 'add-web'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'web'
+            ? { url: item.path, name: item.name, icon: item.icon }
+            : undefined
+        "
         @back="handleBack"
         @confirm="handleWebConfirm"
       />
@@ -102,6 +131,17 @@
       <!-- 添加CMD命令视图 -->
       <AddCmdView
         v-else-if="currentView === 'add-cmd'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'cmd'
+            ? {
+                command: item.path,
+                name: item.name,
+                icon: item.icon,
+                shellType: item.shellType || 'cmd'
+              }
+            : undefined
+        "
         @back="handleBack"
         @confirm="handleCmdConfirm"
       />
@@ -109,6 +149,12 @@
       <!-- 添加动作页视图 -->
       <AddActionPageView
         v-else-if="currentView === 'add-action-page'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'action-page'
+            ? { pageId: item.path, pageName: item.name }
+            : undefined
+        "
         @back="handleBack"
         @confirm="handleActionPageConfirm"
       />
@@ -156,6 +202,23 @@ const modalVisible = ref(false)
 const currentView = ref<
   'selector' | 'add-file' | 'add-folder' | 'add-web' | 'add-cmd' | 'add-action-page'
 >('selector')
+const isEditMode = ref(false) // 是否为编辑模式
+
+// 拖拽相关状态
+const isDragging = ref(false) // 当前 item 是否正在被拖拽
+const isDropTarget = ref(false) // 当前 item 是否为拖拽目标（用于显示高亮）
+
+// 拖拽数据传输类型标识
+const DRAG_TYPE = 'application/x-superpanel-item'
+
+/**
+ * 重置所有拖拽相关状态
+ * 用于确保状态清理的完整性
+ */
+function resetDragStates(): void {
+  isDragging.value = false
+  isDropTarget.value = false
+}
 
 // 获取当前位置的项目
 // 根据区域类型从不同的 store 获取
@@ -191,27 +254,20 @@ const contextMenuItems = computed<ContextMenuItem[]>(() => {
   return [
     {
       type: 'item',
+      label: '编辑',
+      icon: 'mdi:pencil',
+      action: handleEdit
+    },
+    {
+      type: 'divider'
+    },
+    {
+      type: 'item',
       label: '删除',
       icon: 'mdi:delete',
       danger: true,
       action: handleDelete
     }
-    // 未来可以在这里添加更多菜单项，例如：
-    // {
-    //   type: 'item',
-    //   label: '编辑',
-    //   icon: 'mdi:pencil',
-    //   action: handleEdit
-    // },
-    // {
-    //   type: 'divider'
-    // },
-    // {
-    //   type: 'item',
-    //   label: '移动到...',
-    //   icon: 'mdi:arrow-right',
-    //   action: handleMove
-    // }
   ]
 })
 
@@ -297,10 +353,41 @@ async function launchApp(): Promise<void> {
 }
 
 /**
- * 打开Modal
+ * 打开Modal（添加模式）
  */
 function openModal(): void {
+  isEditMode.value = false
   currentView.value = 'selector'
+  modalVisible.value = true
+}
+
+/**
+ * 处理编辑
+ */
+function handleEdit(): void {
+  if (!item.value) return
+
+  isEditMode.value = true
+
+  // 根据类型打开对应的编辑视图
+  switch (item.value.type) {
+    case 'file':
+      currentView.value = 'add-file'
+      break
+    case 'folder':
+      currentView.value = 'add-folder'
+      break
+    case 'web':
+      currentView.value = 'add-web'
+      break
+    case 'cmd':
+      currentView.value = 'add-cmd'
+      break
+    case 'action-page':
+      currentView.value = 'add-action-page'
+      break
+  }
+
   modalVisible.value = true
 }
 
@@ -310,6 +397,7 @@ function openModal(): void {
 function handleModalClose(): void {
   modalVisible.value = false
   currentView.value = 'selector'
+  isEditMode.value = false
 }
 
 /**
@@ -342,14 +430,15 @@ function handleBack(): void {
 function handleFileConfirm(data: { fileInfo: FileInfo; icon: string }): void {
   const { fileInfo, icon } = data
 
-  // 创建启动器项目
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
   const newItem = {
-    id: generateUuid.new(),
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
     type: 'file' as const,
     name: fileInfo.name,
     path: fileInfo.path,
     icon: icon,
-    createdAt: Date.now()
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
   // 根据区域保存到不同的 store
@@ -362,7 +451,7 @@ function handleFileConfirm(data: { fileInfo: FileInfo; icon: string }): void {
   // 关闭Modal
   handleModalClose()
 
-  toast.success('添加成功')
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
 }
 
 /**
@@ -371,14 +460,15 @@ function handleFileConfirm(data: { fileInfo: FileInfo; icon: string }): void {
 function handleFolderConfirm(data: { folderInfo: FileInfo; icon: string }): void {
   const { folderInfo, icon } = data
 
-  // 创建启动器项目
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
   const newItem = {
-    id: generateUuid.new(),
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
     type: 'folder' as const,
     name: folderInfo.name,
     path: folderInfo.path,
     icon: icon,
-    createdAt: Date.now()
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
   // 根据区域保存到不同的 store
@@ -391,7 +481,7 @@ function handleFolderConfirm(data: { folderInfo: FileInfo; icon: string }): void
   // 关闭Modal
   handleModalClose()
 
-  toast.success('添加成功')
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
 }
 
 /**
@@ -400,14 +490,15 @@ function handleFolderConfirm(data: { folderInfo: FileInfo; icon: string }): void
 function handleWebConfirm(data: { url: string; name: string; icon: string }): void {
   const { url, name, icon } = data
 
-  // 创建启动器项目
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
   const newItem = {
-    id: generateUuid.new(),
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
     type: 'web' as const,
     name: name,
     path: url,
     icon: icon,
-    createdAt: Date.now()
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
   // 根据区域保存到不同的 store
@@ -420,7 +511,7 @@ function handleWebConfirm(data: { url: string; name: string; icon: string }): vo
   // 关闭Modal
   handleModalClose()
 
-  toast.success('添加成功')
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
 }
 
 /**
@@ -434,15 +525,16 @@ function handleCmdConfirm(data: {
 }): void {
   const { command, name, icon, shellType } = data
 
-  // 创建启动器项目
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
   const newItem = {
-    id: generateUuid.new(),
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
     type: 'cmd' as const,
     name: name,
     path: command, // 将命令存储在 path 字段中
     icon: icon,
     shellType: shellType, // 存储 shell 类型
-    createdAt: Date.now()
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
   // 根据区域保存到不同的 store
@@ -455,7 +547,7 @@ function handleCmdConfirm(data: {
   // 关闭Modal
   handleModalClose()
 
-  toast.success('添加成功')
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
 }
 
 /**
@@ -464,14 +556,15 @@ function handleCmdConfirm(data: {
 function handleActionPageConfirm(data: { pageId: string; pageName: string }): void {
   const { pageId, pageName } = data
 
-  // 创建启动器项目
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
   const newItem = {
-    id: generateUuid.new(),
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
     type: 'action-page' as const,
     name: pageName, // 存储当前名称（实际显示时会从 store 实时获取）
     path: pageId, // 将页面ID存储在 path 字段中
     icon: 'mdi:page-layout-header-footer', // 使用固定图标
-    createdAt: Date.now()
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
   // 根据区域保存到不同的 store
@@ -484,7 +577,7 @@ function handleActionPageConfirm(data: { pageId: string; pageName: string }): vo
   // 关闭Modal
   handleModalClose()
 
-  toast.success('添加成功')
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
 }
 
 /**
@@ -502,6 +595,153 @@ async function handleDelete(): Promise<void> {
     }
     toast.success('删除成功')
   }
+}
+
+// ==================== 拖拽相关功能 ====================
+
+/**
+ * 处理拖拽开始事件
+ * @param event 拖拽事件
+ */
+function handleDragStart(event: DragEvent): void {
+  // 只有当存在 item 且未打开 Modal 时才允许拖拽
+  if (!item.value || modalVisible.value || !event.dataTransfer) return
+
+  // 设置拖拽状态
+  isDragging.value = true
+
+  // 设置拖拽数据
+  const dragData = {
+    index: props.index,
+    area: props.area
+  }
+
+  // 设置拖拽数据和效果
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(dragData))
+
+  // 设置拖拽时的视觉效果（可选）
+  if (event.dataTransfer.setDragImage && event.target instanceof HTMLElement) {
+    // 使用当前元素作为拖拽图像
+    event.dataTransfer.setDragImage(
+      event.target,
+      event.target.offsetWidth / 2,
+      event.target.offsetHeight / 2
+    )
+  }
+}
+
+/**
+ * 处理拖拽悬停事件
+ * @param event 拖拽事件
+ */
+function handleDragOver(event: DragEvent): void {
+  if (!event.dataTransfer) return
+
+  // 检查是否是有效的拖拽类型
+  const types = event.dataTransfer.types
+  if (!types.includes(DRAG_TYPE)) {
+    return
+  }
+
+  // 获取拖拽数据
+  const dragDataStr = event.dataTransfer.getData(DRAG_TYPE)
+  let dragData: { index: number; area: string } | null = null
+
+  try {
+    dragData = dragDataStr ? JSON.parse(dragDataStr) : null
+  } catch {
+    // Safari 在 dragover 事件中可能无法访问数据，这是正常的
+    // 我们仍然允许 drop，因为实际验证会在 drop 事件中进行
+  }
+
+  // 如果能解析到数据，验证是否同一区域
+  if (dragData && dragData.area !== props.area) {
+    // 不同区域不允许拖拽
+    event.dataTransfer.dropEffect = 'none'
+    return
+  }
+
+  // 如果是相同的 item，不显示 drop target 效果
+  if (dragData && dragData.index === props.index) {
+    isDropTarget.value = false
+    event.dataTransfer.dropEffect = 'none'
+    return
+  }
+
+  // 允许放置
+  event.dataTransfer.dropEffect = 'move'
+  isDropTarget.value = true
+}
+
+/**
+ * 处理拖拽离开事件
+ */
+function handleDragLeave(): void {
+  isDropTarget.value = false
+}
+
+/**
+ * 处理放置事件
+ * @param event 拖拽事件
+ */
+function handleDrop(event: DragEvent): void {
+  // 立即重置拖拽状态（第一层防护）
+  resetDragStates()
+
+  if (!event.dataTransfer) return
+
+  try {
+    // 获取拖拽数据
+    const dragDataStr = event.dataTransfer.getData(DRAG_TYPE)
+    if (!dragDataStr) {
+      console.warn('No drag data found')
+      return
+    }
+
+    const dragData = JSON.parse(dragDataStr) as { index: number; area: string }
+
+    // 验证：必须在同一区域内拖拽
+    if (dragData.area !== props.area) {
+      console.warn('Cannot drag items between different areas')
+      return
+    }
+
+    // 验证：不能拖到自己
+    if (dragData.index === props.index) {
+      return
+    }
+
+    // 执行交换
+    const fromIndex = dragData.index
+    const toIndex = props.index
+
+    if (props.area === 'main') {
+      appLauncherStore.swapItems(fromIndex, toIndex)
+    } else {
+      actionPageStore.swapCurrentPageItems(fromIndex, toIndex)
+    }
+
+    // 显示成功提示（可选，避免过于频繁的提示）
+    // toast.success('位置已交换')
+  } catch (error) {
+    console.error('Error handling drop:', error)
+    toast.error('操作失败')
+  } finally {
+    // 添加延迟兜底清理（第四层防护）
+    // 防止在某些极端情况下状态没有被正确重置
+    setTimeout(() => {
+      resetDragStates()
+    }, 100)
+  }
+}
+
+/**
+ * 处理拖拽结束事件（第三层防护）
+ */
+function handleDragEnd(): void {
+  // 使用统一的重置函数
+  resetDragStates()
 }
 
 /**
@@ -580,6 +820,26 @@ function getCmdIconColor(icon: string): string {
 watch(modalVisible, (newValue) => {
   window.api.superPanel.setModalOpen(newValue)
 })
+
+/**
+ * 监听 item 数据变化，自动重置拖拽状态（第二层防护 - 关键！）
+ *
+ * 当 item 数据发生变化时（通常是因为拖拽交换），
+ * 立即重置当前组件的拖拽状态，避免状态残留。
+ *
+ * 这是解决"拖拽后变灰"问题的核心机制：
+ * - 交换发生时，组件实例不变，但显示的数据变了
+ * - 此时必须清理旧的拖拽状态，否则会出现视觉残留
+ */
+watch(
+  item,
+  () => {
+    // 当 item 变化时，重置所有拖拽相关状态
+    // 这确保了数据交换后，组件状态与新数据保持一致
+    resetDragStates()
+  },
+  { deep: true }
+)
 
 // 组件挂载时初始化 store (仅第一个组件执行)
 onMounted(() => {

@@ -50,6 +50,22 @@ const api = {
     hide: () => ipcRenderer.send('hide-super-panel'),
     // 设置面板固定状态
     setPinned: (pinned: boolean) => ipcRenderer.send('super-panel:set-pinned', pinned)
+  },
+  // Settings 相关API
+  settings: {
+    // 获取默认存储目录
+    getDefaultStorageDirectory: () => ipcRenderer.invoke('settings:get-default-storage-directory'),
+    // 选择文件夹
+    selectFolder: (currentPath?: string) =>
+      ipcRenderer.invoke('settings:select-folder', currentPath),
+    // 获取开机自启动状态
+    getAutoLaunch: () => ipcRenderer.invoke('settings:get-auto-launch'),
+    // 设置开机自启动
+    setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('settings:set-auto-launch', enabled),
+    // 注册全局快捷键
+    registerHotkey: (hotkey: string) => ipcRenderer.invoke('settings:register-hotkey', hotkey),
+    // 注销全局快捷键
+    unregisterHotkey: (hotkey: string) => ipcRenderer.invoke('settings:unregister-hotkey', hotkey)
   }
 }
 

@@ -9,12 +9,18 @@
       >
         <Icon icon="mdi:arrow-left" class="text-xl text-gray-600" />
       </button>
-      <h2 class="text-base font-semibold text-gray-800">选择动作页</h2>
+      <h2 class="text-base font-semibold text-gray-800">
+        {{ mode === 'edit' ? '编辑动作页' : '选择动作页' }}
+      </h2>
     </div>
 
     <!-- 提示信息 -->
     <div class="text-xs text-gray-500 px-1">
-      选择一个动作页作为快捷方式,点击后可快速切换到该页面
+      {{
+        mode === 'edit'
+          ? '选择一个新的动作页进行替换'
+          : '选择一个动作页作为快捷方式,点击后可快速切换到该页面'
+      }}
     </div>
 
     <!-- 动作页列表 -->
@@ -75,6 +81,18 @@ import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useActionPageStore } from '../../stores/actionPage'
 import type { ActionPage } from '../../types/launcher'
+
+interface Props {
+  mode?: 'add' | 'edit'
+  initialData?: {
+    pageId: string
+    pageName: string
+  }
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'add'
+})
 
 const emit = defineEmits<{
   back: []

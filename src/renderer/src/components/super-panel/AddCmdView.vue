@@ -5,7 +5,9 @@
       <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" @click="emit('back')">
         <Icon icon="mdi:arrow-left" class="text-xl text-gray-600" />
       </button>
-      <h2 class="text-lg font-semibold text-gray-800">添加CMD命令</h2>
+      <h2 class="text-lg font-semibold text-gray-800">
+        {{ mode === 'edit' ? '编辑CMD命令' : '添加CMD命令' }}
+      </h2>
     </div>
 
     <!-- 主体区域 - 支持滚动 -->
@@ -130,16 +132,30 @@
         :disabled="!isValid"
         @click="handleConfirm"
       >
-        确认添加
+        {{ mode === 'edit' ? '确认保存' : '确认添加' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useToast } from '../../composables/useToast'
+
+interface Props {
+  mode?: 'add' | 'edit'
+  initialData?: {
+    command: string
+    name: string
+    icon: string
+    shellType: 'cmd' | 'powershell'
+  }
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'add'
+})
 
 const emit = defineEmits<{
   back: []
@@ -155,6 +171,15 @@ const shellType = ref<'cmd' | 'powershell'>('cmd')
 const dropdownOpen = ref(false)
 // 使用默认图标
 const selectedIcon = 'mdi:console'
+
+// 编辑模式下初始化数据
+onMounted(() => {
+  if (props.mode === 'edit' && props.initialData) {
+    displayName.value = props.initialData.name
+    command.value = props.initialData.command
+    shellType.value = props.initialData.shellType
+  }
+})
 
 /**
  * 选择 Shell 类型

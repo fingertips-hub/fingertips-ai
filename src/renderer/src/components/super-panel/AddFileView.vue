@@ -5,7 +5,9 @@
       <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" @click="emit('back')">
         <Icon icon="mdi:arrow-left" class="text-xl text-gray-600" />
       </button>
-      <h2 class="text-lg font-semibold text-gray-800">添加文件</h2>
+      <h2 class="text-lg font-semibold text-gray-800">
+        {{ mode === 'edit' ? '编辑文件' : '添加文件' }}
+      </h2>
     </div>
 
     <!-- 主体区域 - 支持滚动 -->
@@ -111,17 +113,29 @@
         :disabled="!fileInfo || loading"
         @click="handleConfirm"
       >
-        {{ loading ? '处理中...' : '确认添加' }}
+        {{ loading ? '处理中...' : mode === 'edit' ? '确认保存' : '确认添加' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { FileInfo } from '../../types/launcher'
 import { useToast } from '../../composables/useToast'
+
+interface Props {
+  mode?: 'add' | 'edit'
+  initialData?: {
+    fileInfo: FileInfo
+    icon: string
+  }
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'add'
+})
 
 const emit = defineEmits<{
   back: []
@@ -137,6 +151,15 @@ const fileInfo = ref<FileInfo | null>(null)
 const iconData = ref<string | null>(null)
 const displayName = ref('')
 const dropZoneRef = ref<HTMLElement | null>(null)
+
+// 编辑模式下初始化数据
+onMounted(() => {
+  if (props.mode === 'edit' && props.initialData) {
+    fileInfo.value = { ...props.initialData.fileInfo }
+    iconData.value = props.initialData.icon
+    displayName.value = props.initialData.fileInfo.name
+  }
+})
 
 /**
  * 处理文件选择

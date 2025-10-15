@@ -1,2 +1,2 @@
-[ ] item编辑
-[ ] item拖动移动
+[x] item编辑
+[x] item拖动移动

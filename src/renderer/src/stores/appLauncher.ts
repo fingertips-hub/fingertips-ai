@@ -123,6 +123,35 @@ export const useAppLauncherStore = defineStore('appLauncher', () => {
     return items.value.get(index) === null
   }
 
+  /**
+   * 交换两个位置的项目
+   * @param fromIndex 源位置索引 (0-19)
+   * @param toIndex 目标位置索引 (0-19)
+   */
+  function swapItems(fromIndex: number, toIndex: number): void {
+    // 验证索引范围
+    if (fromIndex < 0 || fromIndex >= MAX_ITEMS || toIndex < 0 || toIndex >= MAX_ITEMS) {
+      console.error(`Invalid index: fromIndex=${fromIndex}, toIndex=${toIndex}`)
+      return
+    }
+
+    // 如果是同一个位置，不需要交换
+    if (fromIndex === toIndex) {
+      return
+    }
+
+    // 获取两个位置的项目
+    const fromItem = items.value.get(fromIndex)
+    const toItem = items.value.get(toIndex)
+
+    // 执行交换
+    items.value.set(fromIndex, toItem ?? null)
+    items.value.set(toIndex, fromItem ?? null)
+
+    // 保存到 localStorage
+    saveToStorage()
+  }
+
   return {
     items,
     initialize,
@@ -132,6 +161,7 @@ export const useAppLauncherStore = defineStore('appLauncher', () => {
     clearAll,
     usedCount,
     availableCount,
-    isSlotEmpty
+    isSlotEmpty,
+    swapItems
   }
 })

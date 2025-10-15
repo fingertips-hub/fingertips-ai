@@ -310,6 +310,67 @@ export const useActionPageStore = defineStore('actionPage', () => {
     return currentIndex < pageList.length - 1
   })
 
+  /**
+   * 交换指定页面中两个位置的项目
+   * @param pageId 页面 ID
+   * @param fromIndex 源位置索引 (0-19)
+   * @param toIndex 目标位置索引 (0-19)
+   */
+  function swapItems(pageId: string, fromIndex: number, toIndex: number): void {
+    // 验证索引范围
+    if (
+      fromIndex < 0 ||
+      fromIndex >= MAX_ITEMS_PER_PAGE ||
+      toIndex < 0 ||
+      toIndex >= MAX_ITEMS_PER_PAGE
+    ) {
+      console.error(`Invalid index: fromIndex=${fromIndex}, toIndex=${toIndex}`)
+      return
+    }
+
+    // 如果是同一个位置，不需要交换
+    if (fromIndex === toIndex) {
+      return
+    }
+
+    const page = pages.value.get(pageId)
+    if (!page) {
+      console.error(`Page not found: ${pageId}`)
+      return
+    }
+
+    // 获取两个位置的项目
+    const fromItem = page.items[fromIndex] || null
+    const toItem = page.items[toIndex] || null
+
+    // 执行交换
+    if (fromItem) {
+      page.items[toIndex] = fromItem
+    } else {
+      delete page.items[toIndex]
+    }
+
+    if (toItem) {
+      page.items[fromIndex] = toItem
+    } else {
+      delete page.items[fromIndex]
+    }
+
+    // 保存到 localStorage
+    saveToStorage()
+  }
+
+  /**
+   * 交换当前页面中两个位置的项目
+   * @param fromIndex 源位置索引 (0-19)
+   * @param toIndex 目标位置索引 (0-19)
+   */
+  function swapCurrentPageItems(fromIndex: number, toIndex: number): void {
+    if (currentPageId.value) {
+      swapItems(currentPageId.value, fromIndex, toIndex)
+    }
+  }
+
   return {
     // State
     pages,
@@ -333,6 +394,8 @@ export const useActionPageStore = defineStore('actionPage', () => {
     removeCurrentPageItem,
     previousPage,
     nextPage,
-    cleanupActionPageReferences
+    cleanupActionPageReferences,
+    swapItems,
+    swapCurrentPageItems
   }
 })

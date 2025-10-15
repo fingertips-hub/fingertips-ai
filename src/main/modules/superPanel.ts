@@ -26,6 +26,7 @@ export function createSuperPanelWindow(): BrowserWindow {
     height: SUPER_PANEL_CONFIG.height,
     show: false,
     frame: false,
+    transparent: true,
     alwaysOnTop: true,
     autoHideMenuBar: true,
     resizable: false,

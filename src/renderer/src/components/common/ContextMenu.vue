@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onUnmounted, nextTick, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 /**
@@ -51,10 +51,10 @@ export interface ContextMenuItem {
 }
 
 interface Props {
-  visible: boolean // 是否显示菜单
-  x: number // 鼠标X坐标
-  y: number // 鼠标Y坐标
-  menuItems: ContextMenuItem[] // 菜单项列表
+  visible?: boolean // 是否显示菜单
+  x?: number // 鼠标X坐标
+  y?: number // 鼠标Y坐标
+  menuItems?: ContextMenuItem[] // 菜单项列表
 }
 
 const props = withDefaults(defineProps<Props>(), {

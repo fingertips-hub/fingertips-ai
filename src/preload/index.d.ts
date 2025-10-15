@@ -28,6 +28,14 @@ interface API {
     hide: () => void
     setPinned: (pinned: boolean) => void
   }
+  settings: {
+    getDefaultStorageDirectory: () => Promise<string>
+    selectFolder: (currentPath?: string) => Promise<string | null>
+    getAutoLaunch: () => Promise<boolean>
+    setAutoLaunch: (enabled: boolean) => Promise<boolean>
+    registerHotkey: (hotkey: string) => Promise<boolean>
+    unregisterHotkey: (hotkey: string) => Promise<boolean>
+  }
 }
 
 declare global {
