@@ -89,7 +89,7 @@ const items: TypeItem[] = [
     label: 'AI快捷命令',
     description: '添加AI快捷命令',
     icon: 'mdi:robot',
-    disabled: true
+    disabled: false // 已实现
   },
   {
     type: 'plugin',

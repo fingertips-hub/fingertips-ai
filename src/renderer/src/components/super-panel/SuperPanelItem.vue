@@ -63,6 +63,13 @@
         >
           <Icon icon="mdi:page-layout-header-footer" class="text-xl text-blue-500" />
         </div>
+        <!-- 如果是AI快捷命令类型，显示 emoji 图标 -->
+        <div
+          v-else-if="item.type === 'ai-shortcut'"
+          class="w-full h-full rounded flex items-center justify-center bg-blue-50 text-xl"
+        >
+          {{ item.icon }}
+        </div>
         <!-- 如果有图标且不是文件夹或网页，显示图片 -->
         <img v-else-if="item.icon" :src="item.icon" alt="App Icon" class="w-full h-full" />
         <!-- 默认图标 -->
@@ -158,6 +165,19 @@
         @back="handleBack"
         @confirm="handleActionPageConfirm"
       />
+
+      <!-- 添加AI快捷命令视图 -->
+      <AddAIShortcutView
+        v-else-if="currentView === 'add-ai-shortcut'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'ai-shortcut'
+            ? { shortcutId: item.path, shortcutName: item.name, shortcutIcon: item.icon }
+            : undefined
+        "
+        @back="handleBack"
+        @confirm="handleAIShortcutConfirm"
+      />
     </AddItemModal>
   </div>
 </template>
@@ -178,7 +198,9 @@ import AddFolderView from './AddFolderView.vue'
 import AddWebView from './AddWebView.vue'
 import AddCmdView from './AddCmdView.vue'
 import AddActionPageView from './AddActionPageView.vue'
+import AddAIShortcutView from './AddAIShortcutView.vue'
 import type { LauncherItemType, FileInfo } from '../../types/launcher'
+import { useAIShortcutStore } from '../../stores/aiShortcut'
 
 // 创建 short-uuid 生成器
 const generateUuid = ShortUniqueId()
@@ -194,13 +216,20 @@ const props = withDefaults(defineProps<Props>(), {
 
 const appLauncherStore = useAppLauncherStore()
 const actionPageStore = useActionPageStore()
+const aiShortcutStore = useAIShortcutStore()
 const toast = useToast()
 const contextMenu = useContextMenu()
 
 // 状态
 const modalVisible = ref(false)
 const currentView = ref<
-  'selector' | 'add-file' | 'add-folder' | 'add-web' | 'add-cmd' | 'add-action-page'
+  | 'selector'
+  | 'add-file'
+  | 'add-folder'
+  | 'add-web'
+  | 'add-cmd'
+  | 'add-action-page'
+  | 'add-ai-shortcut'
 >('selector')
 const isEditMode = ref(false) // 是否为编辑模式
 
@@ -290,6 +319,9 @@ async function handleClick(): Promise<void> {
     // 如果是动作页类型，切换到对应页面
     if (item.value.type === 'action-page') {
       switchToActionPage()
+    } else if (item.value.type === 'ai-shortcut') {
+      // 如果是AI快捷命令类型，执行AI命令
+      await executeAIShortcut()
     } else {
       // 其他类型，启动应用
       await launchApp()
@@ -315,6 +347,43 @@ function switchToActionPage(): void {
   } else {
     toast.error('动作页不存在，可能已被删除')
     // 如果页面不存在，删除这个无效的 item
+    handleDelete()
+  }
+}
+
+/**
+ * 执行AI快捷命令
+ */
+async function executeAIShortcut(): Promise<void> {
+  if (!item.value || item.value.type !== 'ai-shortcut') return
+
+  const shortcutId = item.value.path // path 字段存储的是快捷命令ID
+  const shortcut = aiShortcutStore.shortcuts.find((s) => s.id === shortcutId)
+
+  if (shortcut) {
+    // TODO: 实现实际的AI命令执行逻辑
+    // 目前先打印输出
+    console.log('=== 执行AI快捷命令 ===')
+    console.log('命令名称:', shortcut.name)
+    console.log('命令图标:', shortcut.icon)
+    console.log('提示词:', shortcut.prompt)
+    console.log('所属分类:', shortcut.categoryId)
+    console.log('======================')
+
+    toast.success(`正在执行「${shortcut.name}」`)
+
+    // 500ms后先清除 Toast,然后关闭 SuperPanel
+    setTimeout(() => {
+      // 先清除所有 Toast
+      toast.clearAll()
+      // 等待 Toast 动画完成后再关闭 SuperPanel
+      setTimeout(() => {
+        window.api.superPanel.hide()
+      }, 300) // Toast 动画时间
+    }, 500)
+  } else {
+    toast.error('AI命令不存在，可能已被删除')
+    // 如果命令不存在，删除这个无效的 item
     handleDelete()
   }
 }
@@ -386,6 +455,9 @@ function handleEdit(): void {
     case 'action-page':
       currentView.value = 'add-action-page'
       break
+    case 'ai-shortcut':
+      currentView.value = 'add-ai-shortcut'
+      break
   }
 
   modalVisible.value = true
@@ -414,6 +486,8 @@ function handleTypeSelect(type: LauncherItemType): void {
     currentView.value = 'add-cmd'
   } else if (type === 'action-page') {
     currentView.value = 'add-action-page'
+  } else if (type === 'ai-shortcut') {
+    currentView.value = 'add-ai-shortcut'
   }
 }
 
@@ -564,6 +638,40 @@ function handleActionPageConfirm(data: { pageId: string; pageName: string }): vo
     name: pageName, // 存储当前名称（实际显示时会从 store 实时获取）
     path: pageId, // 将页面ID存储在 path 字段中
     icon: 'mdi:page-layout-header-footer', // 使用固定图标
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
+  }
+
+  // 根据区域保存到不同的 store
+  if (props.area === 'main') {
+    appLauncherStore.setItem(props.index, newItem)
+  } else {
+    actionPageStore.setCurrentPageItem(props.index, newItem)
+  }
+
+  // 关闭Modal
+  handleModalClose()
+
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
+}
+
+/**
+ * 处理AI快捷命令确认
+ */
+function handleAIShortcutConfirm(data: {
+  shortcutId: string
+  shortcutName: string
+  shortcutIcon: string
+}): void {
+  const { shortcutId, shortcutName, shortcutIcon } = data
+
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
+  const newItem = {
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
+    type: 'ai-shortcut' as const,
+    name: shortcutName,
+    path: shortcutId, // 将快捷命令ID存储在 path 字段中
+    icon: shortcutIcon, // 存储 emoji 图标
     createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 

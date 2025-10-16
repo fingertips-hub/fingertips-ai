@@ -7,7 +7,7 @@
         @click.self="handleMaskClick"
       >
         <!-- 半透明遮罩 -->
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-lg"></div>
 
         <!-- Modal 内容 -->
         <div

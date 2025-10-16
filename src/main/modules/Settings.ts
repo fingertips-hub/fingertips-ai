@@ -8,8 +8,8 @@ let settingsWindow: BrowserWindow | null = null
 
 // Settings window configuration
 const SETTINGS_WINDOW_CONFIG = {
-  width: 900,
-  height: 650,
+  width: 1000,
+  height: 700,
   minWidth: 700,
   minHeight: 500
 }
@@ -45,6 +45,8 @@ export function createSettingsWindow(): BrowserWindow {
       contextIsolation: true
     }
   })
+
+  window.webContents.openDevTools({ mode: 'detach' })
 
   // Show window when ready
   window.on('ready-to-show', () => {
