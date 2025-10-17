@@ -361,26 +361,30 @@ async function executeAIShortcut(): Promise<void> {
   const shortcut = aiShortcutStore.shortcuts.find((s) => s.id === shortcutId)
 
   if (shortcut) {
-    // TODO: 实现实际的AI命令执行逻辑
-    // 目前先打印输出
-    console.log('=== 执行AI快捷命令 ===')
+    // 打开AI快捷指令运行窗口
+    console.log('=== 打开AI快捷指令运行窗口 ===')
     console.log('命令名称:', shortcut.name)
     console.log('命令图标:', shortcut.icon)
     console.log('提示词:', shortcut.prompt)
-    console.log('所属分类:', shortcut.categoryId)
-    console.log('======================')
+    console.log('===========================')
 
-    toast.success(`正在执行「${shortcut.name}」`)
+    // 🎉 简化流程：选中文本已在 Super Panel 显示时捕获并缓存
+    // 现在直接打开 AI Runner，主进程会自动使用缓存的文本
+    console.log('[SuperPanelItem] 打开 AI Runner（将使用缓存的选中文本）')
 
-    // 500ms后先清除 Toast,然后关闭 SuperPanel
+    // 调用 API 打开运行窗口（selectedText 将由主进程从缓存获取）
+    window.api.aiShortcutRunner.open({
+      id: shortcut.id,
+      name: shortcut.name,
+      icon: shortcut.icon,
+      prompt: shortcut.prompt
+    })
+
+    // 然后隐藏 Super Panel
     setTimeout(() => {
-      // 先清除所有 Toast
       toast.clearAll()
-      // 等待 Toast 动画完成后再关闭 SuperPanel
-      setTimeout(() => {
-        window.api.superPanel.hide()
-      }, 300) // Toast 动画时间
-    }, 500)
+      window.api.superPanel.hide()
+    }, 50)
   } else {
     toast.error('AI命令不存在，可能已被删除')
     // 如果命令不存在，删除这个无效的 item
@@ -401,8 +405,6 @@ async function launchApp(): Promise<void> {
       item.value.shellType
     )
     if (success) {
-      toast.success(`正在打开 ${item.value.name}`)
-
       // 500ms后先清除 Toast,然后关闭 SuperPanel
       setTimeout(() => {
         // 先清除所有 Toast
@@ -410,8 +412,8 @@ async function launchApp(): Promise<void> {
         // 等待 Toast 动画完成后再关闭 SuperPanel
         setTimeout(() => {
           window.api.superPanel.hide()
-        }, 300) // Toast 动画时间
-      }, 500)
+        }, 100) // Toast 动画时间
+      }, 50)
     } else {
       toast.error('打开失败')
     }
@@ -954,6 +956,8 @@ onMounted(() => {
   if (props.index === 0) {
     if (props.area === 'main') {
       appLauncherStore.initialize()
+      // 初始化 AI 快捷指令 Store
+      aiShortcutStore.initialize()
     } else {
       actionPageStore.initialize()
     }

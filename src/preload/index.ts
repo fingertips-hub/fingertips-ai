@@ -55,6 +55,8 @@ const api = {
   settings: {
     // 获取默认存储目录
     getDefaultStorageDirectory: () => ipcRenderer.invoke('settings:get-default-storage-directory'),
+    // 获取当前快捷键
+    getHotkey: () => ipcRenderer.invoke('settings:get-hotkey'),
     // 选择文件夹
     selectFolder: (currentPath?: string) =>
       ipcRenderer.invoke('settings:select-folder', currentPath),
@@ -66,6 +68,34 @@ const api = {
     registerHotkey: (hotkey: string) => ipcRenderer.invoke('settings:register-hotkey', hotkey),
     // 注销全局快捷键
     unregisterHotkey: (hotkey: string) => ipcRenderer.invoke('settings:unregister-hotkey', hotkey)
+  },
+  // AI Shortcut Runner 相关API
+  aiShortcutRunner: {
+    // 打开 AI 快捷指令运行窗口
+    open: (shortcutData: {
+      id: string
+      name: string
+      icon: string
+      prompt: string
+      selectedText?: string
+    }) => ipcRenderer.send('ai-shortcut-runner:open', shortcutData),
+    // 主进程安全捕获当前选中文本（保护剪贴板）
+    captureSelectedText: () => ipcRenderer.invoke('ai-shortcut-runner:capture-selected-text'),
+    // 关闭窗口
+    close: () => ipcRenderer.send('ai-shortcut-runner:close'),
+    // 设置窗口固定状态
+    setPinned: (pinned: boolean) => ipcRenderer.send('ai-shortcut-runner:set-pinned', pinned),
+    // 监听初始化数据
+    onInitData: (
+      callback: (data: {
+        name: string
+        icon: string
+        prompt: string
+        selectedText?: string
+      }) => void
+    ) => {
+      ipcRenderer.on('ai-shortcut-runner:init-data', (_event, data) => callback(data))
+    }
   }
 }
 

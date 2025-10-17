@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group relative bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl border border-gray-200 p-4 transition-all duration-200 cursor-pointer hover:border-blue-400 hover:shadow-lg hover:scale-[1.02]"
+    class="group relative bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl border border-gray-200 p-4 transition-all duration-200 cursor-pointer hover:border-blue-400 hover:shadow-lg hover:scale-[1.02] flex flex-col h-full"
     @click="handleClick"
     @contextmenu.prevent="handleContextMenu"
   >
@@ -20,12 +20,15 @@
     </div>
 
     <!-- 提示词预览 -->
-    <p class="text-xs text-gray-600 line-clamp-3 mb-2 leading-relaxed" :title="shortcut.prompt">
+    <p
+      class="text-xs text-gray-600 line-clamp-3 mb-2 leading-relaxed flex-1"
+      :title="shortcut.prompt"
+    >
       {{ shortcut.prompt }}
     </p>
 
     <!-- 底部信息栏 -->
-    <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-200/60">
+    <div class="flex items-center justify-between pt-3 border-t border-gray-200/60 mt-auto">
       <!-- 时间信息 -->
       <span class="text-xs text-gray-400">{{ formatDate(shortcut.updatedAt) }}</span>
 

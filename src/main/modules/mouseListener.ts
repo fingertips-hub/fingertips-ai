@@ -6,6 +6,7 @@ import {
   isModalOpenState,
   isPinnedState
 } from './superPanel'
+import { captureSelectedText } from './aiShortcutRunner'
 
 // Mouse listener state
 let middleButtonPressTime: number | null = null
@@ -13,18 +14,20 @@ let middleButtonPressPosition: { x: number; y: number } | null = null
 let longPressTimer: NodeJS.Timeout | null = null
 let isListening = false
 let hasShownPanel = false // 标记是否已经显示了面板
+let capturedTextOnPress = '' // 在按键时立即捕获的文本
 
 // Configuration
 const LONG_PRESS_THRESHOLD = 300 // milliseconds - 长按阈值
 const MAX_MOVEMENT_THRESHOLD = 6 // pixels - 最大允许移动距离(像素)
 
 // 当前触发配置
-let currentTrigger: string | null = null // 例如: "LongPress:Middle", "Ctrl+LongPress:Right", "Alt+Space"
+let currentTrigger: string | null = null // 例如: "LongPress:Middle", "Ctrl+LongPress:Right", "Alt+Q"
 let currentTriggerButton: number | null = null // 鼠标按键编号
-let currentTriggerModifiers: Set<string> = new Set() // 所需的修饰键
+const currentTriggerModifiers: Set<string> = new Set() // 所需的修饰键
+let currentTriggerKey: number | null = null // 键盘按键 keycode（用于键盘快捷键）
 
 // 修饰键状态追踪
-let activeModifiers: Set<string> = new Set()
+const activeModifiers: Set<string> = new Set()
 
 /**
  * 鼠标按键映射
@@ -52,12 +55,25 @@ const KEY_CODE_TO_MODIFIER: Record<number, string> = {
 }
 
 /**
+ * 键盘按键名称到 keycode 的映射（常用键）
+ */
+const KEY_NAME_TO_CODE: Record<string, number> = {
+  Q: 16,
+  W: 17,
+  E: 18,
+  R: 19,
+  T: 20,
+  Space: 57
+}
+
+/**
  * 解析触发器配置
  * @param trigger 触发器字符串，例如 "LongPress:Middle", "Ctrl+LongPress:Right", "Alt+Space"
  */
 export function parseTriggerConfig(trigger: string): void {
   currentTrigger = trigger
   currentTriggerButton = null
+  currentTriggerKey = null
   currentTriggerModifiers.clear()
 
   if (!trigger) {
@@ -87,8 +103,25 @@ export function parseTriggerConfig(trigger: string): void {
         `Configured mouse trigger: button=${currentTriggerButton}, modifiers=${Array.from(currentTriggerModifiers).join('+')}`
       )
     }
+  } else {
+    // 键盘快捷键（例如 "Alt+Q", "Ctrl+Space"）
+    const parts = trigger.split('+')
+    const keyPart = parts[parts.length - 1] // 最后一个是按键
+    currentTriggerKey = KEY_NAME_TO_CODE[keyPart]
+
+    // 提取修饰键
+    parts.slice(0, -1).forEach((mod) => {
+      currentTriggerModifiers.add(mod)
+    })
+
+    if (currentTriggerKey) {
+      console.log(
+        `Configured keyboard trigger: key=${keyPart}(${currentTriggerKey}), modifiers=${Array.from(currentTriggerModifiers).join('+')}`
+      )
+    } else {
+      console.warn(`Unknown key: ${keyPart}`)
+    }
   }
-  // 键盘快捷键将由 globalShortcut 处理，这里不处理
 }
 
 /**
@@ -132,6 +165,17 @@ function cancelLongPress(): void {
   middleButtonPressTime = null
   middleButtonPressPosition = null
   hasShownPanel = false
+  // 不清空 capturedTextOnPress，让它保持到用户使用
+}
+
+/**
+ * 获取按键时捕获的文本
+ */
+export function getCapturedTextOnPress(): string {
+  const text = capturedTextOnPress
+  // 返回后清空，避免重复使用
+  capturedTextOnPress = ''
+  return text
 }
 
 /**
@@ -156,13 +200,28 @@ function handleButtonDown(button: number, x: number, y: number): void {
   middleButtonPressPosition = { x, y }
   hasShownPanel = false
 
-  console.log(`Trigger button pressed at (${x}, ${y})`)
+  console.log(`[MouseListener] Trigger button pressed at (${x}, ${y})`)
+
+  // 🔑 关键优化：在按键的瞬间就立即尝试捕获选中文本
+  // 这时选中状态通常还没有丢失（取决于鼠标位置）
+  console.log('[MouseListener] 立即尝试捕获选中文本（在按下瞬间）...')
+  captureSelectedText()
+    .then((text) => {
+      capturedTextOnPress = text
+      console.log('[MouseListener] 按下时捕获的文本长度:', text.length)
+      if (text.length > 0) {
+        console.log('[MouseListener] 捕获成功:', text.substring(0, 50))
+      }
+    })
+    .catch((err) => {
+      console.error('[MouseListener] 捕获失败:', err)
+    })
 
   // 设置定时器,达到阈值后显示面板
   longPressTimer = setTimeout(() => {
     // 检查是否仍在按下状态
     if (middleButtonPressTime !== null && middleButtonPressPosition !== null) {
-      console.log('Long press threshold reached, showing Super Panel')
+      console.log('[MouseListener] Long press threshold reached, showing Super Panel')
       showSuperPanelAtMouse()
       hasShownPanel = true
     }
@@ -237,12 +296,39 @@ export function setupGlobalMouseListener(): void {
     return
   }
 
-  // Keyboard events for modifier tracking
+  // Keyboard events for modifier tracking and keyboard shortcuts
   uIOhook.on('keydown', (event: UiohookKeyboardEvent) => {
     const modifierName = KEY_CODE_TO_MODIFIER[event.keycode]
     if (modifierName) {
       activeModifiers.add(modifierName)
       // console.log(`Modifier pressed: ${modifierName}, active: ${Array.from(activeModifiers).join('+')}`)
+      return
+    }
+
+    // 🔑 检测键盘快捷键触发（例如 Alt+Q）
+    if (currentTriggerKey !== null && event.keycode === currentTriggerKey) {
+      if (checkModifiersMatch()) {
+        console.log(`Keyboard trigger detected: ${currentTrigger}`)
+        console.log('[MouseListener] 键盘快捷键触发，立即捕获选中文本...')
+
+        // 立即捕获选中文本（异步，不阻塞）
+        captureSelectedText()
+          .then((text) => {
+            capturedTextOnPress = text
+            console.log('[MouseListener] 捕获的文本长度:', text.length)
+            if (text.length > 0) {
+              console.log('[MouseListener] 捕获成功:', text.substring(0, 50))
+            }
+          })
+          .catch((err) => {
+            console.error('[MouseListener] 捕获失败:', err)
+          })
+
+        // 短延迟后显示 Super Panel（给捕获时间）
+        setTimeout(() => {
+          showSuperPanelAtMouse()
+        }, 100)
+      }
     }
   })
 
@@ -256,22 +342,22 @@ export function setupGlobalMouseListener(): void {
 
   // Mouse button down event
   uIOhook.on('mousedown', (event: UiohookMouseEvent) => {
-    handleButtonDown(event.button, event.x, event.y)
+    handleButtonDown(event.button as number, event.x as number, event.y as number)
   })
 
   // Mouse button up event
   uIOhook.on('mouseup', (event: UiohookMouseEvent) => {
-    handleButtonUp(event.button)
+    handleButtonUp(event.button as number)
 
     // Left button (button 1) - hide Super Panel when clicking outside
     if (event.button === 1) {
-      handleLeftButtonClick(event.x, event.y)
+      handleLeftButtonClick(event.x as number, event.y as number)
     }
   })
 
   // Mouse move event - 检测按键按下期间的鼠标移动
   uIOhook.on('mousemove', (event: UiohookMouseEvent) => {
-    handleMouseMove(event.x, event.y)
+    handleMouseMove(event.x as number, event.y as number)
   })
 
   // Start the hook

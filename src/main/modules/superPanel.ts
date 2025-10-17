@@ -3,6 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../../resources/icon.png?asset'
 import { calculateWindowPosition } from '../utils/windowPosition'
+import { getCapturedTextOnPress } from './mouseListener'
 
 // Super Panel window instance
 let superPanelWindow: BrowserWindow | null = null
@@ -87,7 +88,7 @@ export function createSuperPanelWindow(): BrowserWindow {
 export function showSuperPanelAtMouse(): void {
   if (!superPanelWindow || superPanelWindow.isDestroyed()) return
 
-  console.log('showSuperPanelAtMouse called')
+  console.log('[SuperPanel] showSuperPanelAtMouse called')
 
   // Get current mouse position
   const cursorPoint = screen.getCursorScreenPoint()
@@ -109,7 +110,14 @@ export function showSuperPanelAtMouse(): void {
   // 通知渲染进程重置 pin 状态
   superPanelWindow.webContents.send('super-panel:reset-pinned')
 
-  console.log('Super Panel shown at position:', { x, y })
+  console.log('[SuperPanel] Super Panel shown at position:', { x, y })
+}
+
+/**
+ * 获取捕获的选中文本（从鼠标监听器）
+ */
+export function getCachedSelectedText(): string {
+  return getCapturedTextOnPress()
 }
 
 /**

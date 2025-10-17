@@ -14,6 +14,7 @@ import {
   cleanupSettingsHandlers,
   initializeDefaultHotkey
 } from './modules/settingsHandlers'
+import { registerAIShortcutRunnerHandlers } from './modules/aiShortcutRunnerHandlers'
 
 // =============================================================================
 // 单实例锁定 - Single Instance Lock
@@ -138,8 +139,13 @@ app.whenReady().then(() => {
   // Setup Settings IPC handlers
   setupSettingsHandlers()
 
-  // Initialize default hotkey
-  initializeDefaultHotkey()
+  // Register AI Shortcut Runner IPC handlers
+  registerAIShortcutRunnerHandlers()
+
+  // Initialize default hotkey (异步)
+  initializeDefaultHotkey().catch((error) => {
+    console.error('Failed to initialize default hotkey:', error)
+  })
 
   // Optional: createWindow() for main window if needed
   // createWindow()

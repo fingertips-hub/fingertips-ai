@@ -75,7 +75,7 @@
           <label class="block text-sm font-medium text-gray-700 mb-2">提示词内容</label>
           <textarea
             v-model="formData.prompt"
-            placeholder="输入 AI 提示词内容...&#10;&#10;例如：请帮我分析以下代码的性能问题，并给出优化建议。"
+            placeholder="输入 AI 提示词内容...&#10;&#10;例如：请帮我分析以下代码的性能问题，并给出优化建议。[TEXT]可以作为占位符，表示用户输入的文本。如果不设置占位符，用户输入的文本追加到提示词末尾。"
             :readonly="mode === 'view'"
             :class="
               mode === 'view'

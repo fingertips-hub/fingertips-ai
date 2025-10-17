@@ -64,6 +64,16 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         saveToStorage()
       }
+
+      // 从主进程同步快捷键设置（主进程是真实的数据源）
+      if (window.api?.settings?.getHotkey) {
+        const savedHotkey = await window.api.settings.getHotkey()
+        if (savedHotkey && savedHotkey !== settings.value.hotkey) {
+          settings.value.hotkey = savedHotkey
+          saveToStorage()
+          console.log('Synced hotkey from main process:', savedHotkey)
+        }
+      }
     } catch (error) {
       console.error('Failed to load settings from localStorage:', error)
     } finally {

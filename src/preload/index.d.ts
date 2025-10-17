@@ -30,11 +30,32 @@ interface API {
   }
   settings: {
     getDefaultStorageDirectory: () => Promise<string>
+    getHotkey: () => Promise<string>
     selectFolder: (currentPath?: string) => Promise<string | null>
     getAutoLaunch: () => Promise<boolean>
     setAutoLaunch: (enabled: boolean) => Promise<boolean>
     registerHotkey: (hotkey: string) => Promise<boolean>
     unregisterHotkey: (hotkey: string) => Promise<boolean>
+  }
+  aiShortcutRunner: {
+    open: (shortcutData: {
+      id: string
+      name: string
+      icon: string
+      prompt: string
+      selectedText?: string
+    }) => void
+    captureSelectedText: () => Promise<string>
+    close: () => void
+    setPinned: (pinned: boolean) => void
+    onInitData: (
+      callback: (data: {
+        name: string
+        icon: string
+        prompt: string
+        selectedText?: string
+      }) => void
+    ) => void
   }
 }
 

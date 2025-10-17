@@ -1,7 +1,7 @@
-import { app, dialog, ipcMain, globalShortcut, BrowserWindow } from 'electron'
-import { showSuperPanelAtMouse } from './superPanel'
+import { app, dialog, ipcMain, BrowserWindow } from 'electron'
 import { getSettingsWindow } from './Settings'
 import { parseTriggerConfig } from './mouseListener'
+import { getHotkey, setHotkey } from './settingsStore'
 
 // 存储当前注册的触发器（快捷键或鼠标动作）
 let currentTrigger: string | null = null
@@ -15,19 +15,36 @@ export function setupSettingsHandlers(): void {
     return app.getPath('userData')
   })
 
+  // 获取当前快捷键设置
+  ipcMain.handle('settings:get-hotkey', async () => {
+    return await getHotkey()
+  })
+
   // 选择文件夹
-  ipcMain.handle('settings:select-folder', async (event, currentPath?: string) => {
+  ipcMain.handle('settings:select-folder', async (_event, currentPath?: string) => {
     // 获取设置窗口作为父窗口，使对话框居中
     const settingsWindow = getSettingsWindow()
+    const parentWindow = settingsWindow || BrowserWindow.getFocusedWindow()
 
-    const result = await dialog.showOpenDialog(
-      settingsWindow || BrowserWindow.getFocusedWindow() || undefined,
-      {
-        properties: ['openDirectory', 'createDirectory'],
-        title: '选择存储目录',
-        defaultPath: currentPath || app.getPath('userData') // 使用当前路径或默认路径
-      }
-    )
+    const options = {
+      properties: ['openDirectory', 'createDirectory'] as Array<
+        | 'openFile'
+        | 'openDirectory'
+        | 'multiSelections'
+        | 'showHiddenFiles'
+        | 'createDirectory'
+        | 'promptToCreate'
+        | 'noResolveAliases'
+        | 'treatPackageAsDirectory'
+        | 'dontAddToRecent'
+      >,
+      title: '选择存储目录',
+      defaultPath: currentPath || app.getPath('userData') // 使用当前路径或默认路径
+    }
+
+    const result = parentWindow
+      ? await dialog.showOpenDialog(parentWindow, options)
+      : await dialog.showOpenDialog(options)
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
@@ -43,7 +60,7 @@ export function setupSettingsHandlers(): void {
   })
 
   // 设置开机自启动
-  ipcMain.handle('settings:set-auto-launch', (event, enabled: boolean) => {
+  ipcMain.handle('settings:set-auto-launch', (_event, enabled: boolean) => {
     try {
       app.setLoginItemSettings({
         openAtLogin: enabled,
@@ -57,19 +74,16 @@ export function setupSettingsHandlers(): void {
   })
 
   // 注册触发器（键盘快捷键或鼠标动作）
-  ipcMain.handle('settings:register-hotkey', (event, trigger: string) => {
+  ipcMain.handle('settings:register-hotkey', async (_event, trigger: string) => {
     try {
       // 如果已经注册了相同的触发器，直接返回成功
       if (currentTrigger === trigger) {
         return true
       }
 
-      // 先注销旧触发器
+      // 先清空旧触发器（通过重新解析空字符串）
       if (currentTrigger) {
-        // 如果旧触发器是键盘快捷键，注销它
-        if (!currentTrigger.includes('LongPress:')) {
-          globalShortcut.unregister(currentTrigger)
-        }
+        parseTriggerConfig('')
         currentTrigger = null
       }
 
@@ -78,23 +92,18 @@ export function setupSettingsHandlers(): void {
         // 鼠标动作 - 通过 mouseListener 处理
         parseTriggerConfig(trigger)
         currentTrigger = trigger
+        // 保存到持久化存储
+        await setHotkey(trigger)
         console.log(`Successfully configured mouse trigger: ${trigger}`)
         return true
       } else {
-        // 键盘快捷键 - 通过 globalShortcut 处理
-        const success = globalShortcut.register(trigger, () => {
-          console.log(`Hotkey ${trigger} pressed, showing Super Panel...`)
-          showSuperPanelAtMouse()
-        })
-
-        if (success) {
-          currentTrigger = trigger
-          console.log(`Successfully registered keyboard hotkey: ${trigger}`)
-          return true
-        } else {
-          console.error(`Failed to register keyboard hotkey: ${trigger}`)
-          return false
-        }
+        // 键盘快捷键 - 通过 mouseListener 的 uiohook 处理（更快响应）
+        parseTriggerConfig(trigger)
+        currentTrigger = trigger
+        // 保存到持久化存储
+        await setHotkey(trigger)
+        console.log(`Successfully configured keyboard hotkey: ${trigger}`)
+        return true
       }
     } catch (error) {
       console.error('Failed to register trigger:', error)
@@ -103,16 +112,11 @@ export function setupSettingsHandlers(): void {
   })
 
   // 注销触发器
-  ipcMain.handle('settings:unregister-hotkey', (event, trigger: string) => {
+  ipcMain.handle('settings:unregister-hotkey', (_event, trigger: string) => {
     try {
       if (currentTrigger === trigger) {
-        // 如果是键盘快捷键，注销它
-        if (!trigger.includes('LongPress:')) {
-          globalShortcut.unregister(trigger)
-        } else {
-          // 鼠标动作，清空配置
-          parseTriggerConfig('')
-        }
+        // 清空触发器配置
+        parseTriggerConfig('')
         currentTrigger = null
         console.log(`Successfully unregistered trigger: ${trigger}`)
       }
@@ -128,18 +132,15 @@ export function setupSettingsHandlers(): void {
  * 清理 Settings IPC handlers
  */
 export function cleanupSettingsHandlers(): void {
-  // 注销所有触发器
+  // 清空所有触发器配置
   if (currentTrigger) {
-    if (!currentTrigger.includes('LongPress:')) {
-      globalShortcut.unregister(currentTrigger)
-    } else {
-      parseTriggerConfig('')
-    }
+    parseTriggerConfig('')
     currentTrigger = null
   }
 
   // 移除 IPC handlers
   ipcMain.removeHandler('settings:get-default-storage-directory')
+  ipcMain.removeHandler('settings:get-hotkey')
   ipcMain.removeHandler('settings:select-folder')
   ipcMain.removeHandler('settings:get-auto-launch')
   ipcMain.removeHandler('settings:set-auto-launch')
@@ -149,16 +150,32 @@ export function cleanupSettingsHandlers(): void {
 
 /**
  * 初始化默认触发器
+ * 从持久化存储中读取用户设置的快捷键
  */
-export function initializeDefaultHotkey(): void {
-  // 注册默认触发器：长按中键
-  const defaultTrigger = 'LongPress:Middle'
+export async function initializeDefaultHotkey(): Promise<void> {
   try {
+    // 从存储中读取用户设置的触发器
+    const savedHotkey = await getHotkey()
+    console.log(`Loading saved trigger: ${savedHotkey}`)
+
+    // 检查是否是鼠标动作
+    if (savedHotkey.includes('LongPress:')) {
+      // 鼠标动作 - 通过 mouseListener 处理
+      parseTriggerConfig(savedHotkey)
+      currentTrigger = savedHotkey
+      console.log(`Successfully configured mouse trigger: ${savedHotkey}`)
+    } else {
+      // 键盘快捷键 - 通过 mouseListener 的 uiohook 处理（更快响应）
+      parseTriggerConfig(savedHotkey)
+      currentTrigger = savedHotkey
+      console.log(`Successfully configured keyboard hotkey: ${savedHotkey}`)
+    }
+  } catch (error) {
+    console.error('Failed to initialize trigger:', error)
+    // 出错时使用默认触发器
+    const defaultTrigger = 'LongPress:Middle'
     parseTriggerConfig(defaultTrigger)
     currentTrigger = defaultTrigger
-    console.log(`Successfully configured default trigger: ${defaultTrigger}`)
-  } catch (error) {
-    console.error('Failed to initialize default trigger:', error)
   }
 }
 
