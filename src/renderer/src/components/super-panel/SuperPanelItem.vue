@@ -70,6 +70,13 @@
         >
           {{ item.icon }}
         </div>
+        <!-- 如果是插件类型，显示 iconify 图标 -->
+        <div
+          v-else-if="item.type === 'plugin'"
+          class="w-full h-full rounded flex items-center justify-center bg-purple-50"
+        >
+          <Icon :icon="item.icon" class="text-xl text-purple-600" />
+        </div>
         <!-- 如果有图标且不是文件夹或网页，显示图片 -->
         <img v-else-if="item.icon" :src="item.icon" alt="App Icon" class="w-full h-full" />
         <!-- 默认图标 -->
@@ -178,6 +185,19 @@
         @back="handleBack"
         @confirm="handleAIShortcutConfirm"
       />
+
+      <!-- 添加插件视图 -->
+      <AddPluginView
+        v-else-if="currentView === 'add-plugin'"
+        :mode="isEditMode ? 'edit' : 'add'"
+        :initial-data="
+          isEditMode && item?.type === 'plugin'
+            ? { pluginId: item.path, pluginName: item.name, pluginIcon: item.icon }
+            : undefined
+        "
+        @back="handleBack"
+        @confirm="handlePluginConfirm"
+      />
     </AddItemModal>
   </div>
 </template>
@@ -199,8 +219,10 @@ import AddWebView from './AddWebView.vue'
 import AddCmdView from './AddCmdView.vue'
 import AddActionPageView from './AddActionPageView.vue'
 import AddAIShortcutView from './AddAIShortcutView.vue'
+import AddPluginView from './AddPluginView.vue'
 import type { LauncherItemType, FileInfo } from '../../types/launcher'
 import { useAIShortcutStore } from '../../stores/aiShortcut'
+import { usePluginStore } from '../../stores/plugin'
 
 // 创建 short-uuid 生成器
 const generateUuid = ShortUniqueId()
@@ -217,6 +239,7 @@ const props = withDefaults(defineProps<Props>(), {
 const appLauncherStore = useAppLauncherStore()
 const actionPageStore = useActionPageStore()
 const aiShortcutStore = useAIShortcutStore()
+const pluginStore = usePluginStore()
 const toast = useToast()
 const contextMenu = useContextMenu()
 
@@ -230,6 +253,7 @@ const currentView = ref<
   | 'add-cmd'
   | 'add-action-page'
   | 'add-ai-shortcut'
+  | 'add-plugin'
 >('selector')
 const isEditMode = ref(false) // 是否为编辑模式
 
@@ -260,9 +284,15 @@ const item = computed(() => {
   }
 })
 
-// 获取显示名称（对于 action-page 类型，实时从 store 获取最新名称）
+// 获取显示名称（对于 action-page 和 plugin 类型，实时从 store 获取最新名称）
 const displayName = computed(() => {
   if (!item.value) return ''
+
+  // 如果是插件类型，从 pluginStore 实时获取插件名称
+  if (item.value.type === 'plugin') {
+    const plugin = pluginStore.plugins.find((p) => p.id === item.value!.path)
+    return plugin ? plugin.name : item.value.name
+  }
 
   // 如果是动作页类型，从 actionPageStore 实时获取页面名称
   if (item.value.type === 'action-page') {
@@ -322,6 +352,9 @@ async function handleClick(): Promise<void> {
     } else if (item.value.type === 'ai-shortcut') {
       // 如果是AI快捷命令类型，执行AI命令
       await executeAIShortcut()
+    } else if (item.value.type === 'plugin') {
+      // 如果是插件类型，执行插件
+      await executePlugin()
     } else {
       // 其他类型，启动应用
       await launchApp()
@@ -377,7 +410,8 @@ async function executeAIShortcut(): Promise<void> {
       id: shortcut.id,
       name: shortcut.name,
       icon: shortcut.icon,
-      prompt: shortcut.prompt
+      prompt: shortcut.prompt,
+      autoExecute: true // 自动执行
     })
 
     // 然后隐藏 Super Panel
@@ -390,6 +424,70 @@ async function executeAIShortcut(): Promise<void> {
     // 如果命令不存在，删除这个无效的 item
     handleDelete()
   }
+}
+
+/**
+ * 执行插件
+ */
+async function executePlugin(): Promise<void> {
+  if (!item.value || item.value.type !== 'plugin') return
+
+  const pluginId = item.value.path // path 字段存储的是插件ID
+
+  // 先尝试从已加载的插件列表中查找（用于显示名称）
+  let plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+
+  // 如果找不到，可能是插件列表未加载，尝试重新加载
+  if (!plugin && pluginStore.plugins.length === 0) {
+    console.log('插件列表未加载，正在加载...')
+    await pluginStore.loadPlugins()
+    plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+  }
+
+  const pluginName = plugin?.name || item.value.name
+
+  console.log('=== 执行插件 ===')
+  console.log('插件名称:', pluginName)
+  console.log('插件ID:', pluginId)
+  console.log('================')
+
+  // 🎯 关键修复：先隐藏 SuperPanel，避免与插件窗口的焦点冲突
+  // 插件可能会显示对话框或窗口，需要立即隐藏 SuperPanel
+  setTimeout(() => {
+    toast.clearAll()
+    window.api.superPanel.hide()
+  }, 50)
+
+  // 然后异步执行插件（不阻塞 SuperPanel 的隐藏）
+  // 使用 setTimeout 确保 SuperPanel 隐藏操作先执行
+  setTimeout(async () => {
+    try {
+      // 🎯 优化：获取捕获的选中文本，直接传递给插件
+      const capturedText = await window.api.superPanel.getCapturedText()
+      console.log('[SuperPanelItem] 捕获的文本长度:', capturedText.length)
+
+      // 构建插件参数，将选中文本作为 text 参数传递
+      const params = capturedText ? { text: capturedText } : undefined
+
+      // 调用主进程的执行 API，让主进程处理所有状态检查
+      await pluginStore.executePlugin(pluginId, params)
+      console.log(`插件「${pluginName}」执行完成`)
+    } catch (error) {
+      console.error('执行插件失败:', error)
+      const errorMessage = (error as Error).message
+
+      // 根据错误消息提供友好的提示
+      if (errorMessage.includes('not found')) {
+        console.error('插件不存在，可能已被卸载')
+      } else if (errorMessage.includes('not activated')) {
+        console.error('插件未启用，请先在设置中启用该插件')
+      } else {
+        console.error(`执行插件失败: ${errorMessage}`)
+      }
+      // 注意：此时 SuperPanel 已隐藏，所以不显示 toast 错误提示
+      // 错误信息已在插件内部通过对话框或通知显示
+    }
+  }, 100)
 }
 
 /**
@@ -460,6 +558,9 @@ function handleEdit(): void {
     case 'ai-shortcut':
       currentView.value = 'add-ai-shortcut'
       break
+    case 'plugin':
+      currentView.value = 'add-plugin'
+      break
   }
 
   modalVisible.value = true
@@ -490,6 +591,8 @@ function handleTypeSelect(type: LauncherItemType): void {
     currentView.value = 'add-action-page'
   } else if (type === 'ai-shortcut') {
     currentView.value = 'add-ai-shortcut'
+  } else if (type === 'plugin') {
+    currentView.value = 'add-plugin'
   }
 }
 
@@ -674,6 +777,40 @@ function handleAIShortcutConfirm(data: {
     name: shortcutName,
     path: shortcutId, // 将快捷命令ID存储在 path 字段中
     icon: shortcutIcon, // 存储 emoji 图标
+    createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
+  }
+
+  // 根据区域保存到不同的 store
+  if (props.area === 'main') {
+    appLauncherStore.setItem(props.index, newItem)
+  } else {
+    actionPageStore.setCurrentPageItem(props.index, newItem)
+  }
+
+  // 关闭Modal
+  handleModalClose()
+
+  toast.success(isEditMode.value ? '保存成功' : '添加成功')
+}
+
+/**
+ * 处理插件确认
+ */
+function handlePluginConfirm(data: {
+  pluginId: string
+  pluginName: string
+  pluginIcon: string
+}): void {
+  const { pluginId, pluginName, pluginIcon } = data
+
+  // 编辑模式：保留原有 id 和 createdAt
+  // 添加模式：生成新的 id 和 createdAt
+  const newItem = {
+    id: isEditMode.value && item.value ? item.value.id : generateUuid.new(),
+    type: 'plugin' as const,
+    name: pluginName,
+    path: pluginId, // 将插件ID存储在 path 字段中
+    icon: pluginIcon, // 存储 iconify 图标
     createdAt: isEditMode.value && item.value ? item.value.createdAt : Date.now()
   }
 
@@ -952,12 +1089,14 @@ watch(
 )
 
 // 组件挂载时初始化 store (仅第一个组件执行)
-onMounted(() => {
+onMounted(async () => {
   if (props.index === 0) {
     if (props.area === 'main') {
       appLauncherStore.initialize()
       // 初始化 AI 快捷指令 Store
       aiShortcutStore.initialize()
+      // 加载插件列表（用于显示插件名称和执行插件）
+      await pluginStore.loadPlugins()
     } else {
       actionPageStore.initialize()
     }

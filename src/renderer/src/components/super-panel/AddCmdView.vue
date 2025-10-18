@@ -99,9 +99,57 @@
 
         <!-- 命令输入 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            {{ shellType === 'cmd' ? 'CMD命令' : 'PowerShell命令' }}
-          </label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-700">
+              {{ shellType === 'cmd' ? 'CMD命令' : 'PowerShell命令' }}
+            </label>
+            <!-- 操作按钮组 -->
+            <div class="flex items-center gap-2">
+              <!-- 测试按钮 -->
+              <button
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                :class="
+                  canTest && !isTesting
+                    ? 'bg-green-500 hover:bg-green-600 text-white shadow-sm hover:shadow-md'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                "
+                :title="!command.trim() ? '请先输入命令' : isTesting ? '测试中...' : '测试命令'"
+                :disabled="!canTest || isTesting"
+                @click="handleTestCommand"
+              >
+                <Icon
+                  :icon="isTesting ? 'mdi:loading' : 'mdi:play-circle-outline'"
+                  class="text-base"
+                  :class="{ 'animate-spin': isTesting }"
+                />
+                <span>{{ isTesting ? '测试中...' : '测试' }}</span>
+              </button>
+
+              <!-- AI 生成按钮 -->
+              <button
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                :class="
+                  canGenerate && !isGenerating
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-sm hover:shadow-md'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                "
+                :title="
+                  !command.trim() ? '请先输入命令描述' : isGenerating ? '生成中...' : 'AI 生成命令'
+                "
+                :disabled="!canGenerate || isGenerating"
+                @click="handleGenerateCommand"
+              >
+                <Icon
+                  :icon="isGenerating ? 'mdi:loading' : 'mdi:auto-fix'"
+                  class="text-base"
+                  :class="{ 'animate-spin': isGenerating }"
+                />
+                <span>{{ isGenerating ? '生成中...' : 'AI 生成' }}</span>
+              </button>
+            </div>
+          </div>
           <div class="relative p-1">
             <textarea
               v-model="command"
@@ -169,6 +217,8 @@ const displayName = ref('')
 const command = ref('')
 const shellType = ref<'cmd' | 'powershell'>('cmd')
 const dropdownOpen = ref(false)
+const isGenerating = ref(false) // AI 生成状态
+const isTesting = ref(false) // 测试状态
 // 使用默认图标
 const selectedIcon = 'mdi:console'
 
@@ -205,6 +255,85 @@ function handleDropdownBlur(): void {
 const isValid = computed(() => {
   return displayName.value.trim() && command.value.trim()
 })
+
+/**
+ * 是否可以生成命令
+ * 要求：命令描述不为空
+ */
+const canGenerate = computed(() => {
+  return command.value.trim().length > 0
+})
+
+/**
+ * 是否可以测试命令
+ * 要求：命令不为空
+ */
+const canTest = computed(() => {
+  return command.value.trim().length > 0
+})
+
+/**
+ * 使用 AI 生成命令
+ */
+async function handleGenerateCommand(): Promise<void> {
+  if (!canGenerate.value || isGenerating.value) {
+    return
+  }
+
+  // 获取用户输入的描述
+  const description = command.value.trim()
+
+  try {
+    isGenerating.value = true
+    toast.info('正在生成命令...')
+
+    // 调用 AI 生成命令
+    const result = await window.api.cmdGenerator.generate(description, shellType.value)
+
+    if (result.success && result.command) {
+      // 将生成的命令填充到文本域
+      command.value = result.command
+      toast.success('命令生成成功')
+    } else {
+      toast.error(result.error || '生成命令失败')
+    }
+  } catch (error) {
+    console.error('Generate command error:', error)
+    toast.error('生成命令失败，请稍后重试')
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+/**
+ * 测试命令
+ */
+async function handleTestCommand(): Promise<void> {
+  if (!canTest.value || isTesting.value) {
+    return
+  }
+
+  const testCommand = command.value.trim()
+
+  try {
+    isTesting.value = true
+    toast.info('正在测试命令...')
+
+    // 调用 launcher API 执行命令
+    const result = await window.api.launcher.launchApp(testCommand, 'cmd', shellType.value)
+
+    if (result) {
+      toast.success('命令已在新窗口中打开')
+    } else {
+      toast.error('命令测试失败')
+    }
+  } catch (error) {
+    console.error('Test command error:', error)
+    toast.error('命令测试失败，请检查命令语法')
+  } finally {
+    isTesting.value = false
+  }
+}
 
 /**
  * 确认添加

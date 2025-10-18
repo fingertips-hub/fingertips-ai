@@ -94,9 +94,9 @@ const items: TypeItem[] = [
   {
     type: 'plugin',
     label: '插件',
-    description: '添加插件',
-    icon: 'mdi:plugin',
-    disabled: true
+    description: '添加已启用的插件快捷方式',
+    icon: 'mdi:puzzle',
+    disabled: false // 已实现
   }
 ]
 

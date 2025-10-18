@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    @click.self="handleCancel"
+    @click.self="handleMaskClick"
   >
     <div class="bg-white rounded-lg shadow-xl p-6 w-96 animate-fade-in">
       <!-- 标题 -->
@@ -47,6 +47,7 @@ interface Props {
   title?: string
   placeholder?: string
   defaultValue?: string
+  closeOnMask?: boolean // 点击遮罩是否关闭
 }
 
 interface Emits {
@@ -58,7 +59,8 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   title: '请输入',
   placeholder: '',
-  defaultValue: ''
+  defaultValue: '',
+  closeOnMask: false // 默认点击遮罩不关闭
 })
 
 const emit = defineEmits<Emits>()
@@ -98,6 +100,15 @@ function handleCancel(): void {
   emit('cancel')
   emit('update:visible', false)
   inputValue.value = ''
+}
+
+/**
+ * 点击遮罩
+ */
+function handleMaskClick(): void {
+  if (props.closeOnMask) {
+    handleCancel()
+  }
 }
 </script>
 

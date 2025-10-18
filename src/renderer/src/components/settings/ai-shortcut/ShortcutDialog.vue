@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    @click.self="handleCancel"
+    @click.self="handleMaskClick"
   >
     <div
       class="bg-white rounded-lg shadow-xl p-6 w-[600px] max-h-[90vh] flex flex-col animate-fade-in"
@@ -68,6 +68,83 @@
             </option>
           </select>
           <p class="text-xs text-gray-500 mt-1">选择指令所属的分类</p>
+        </div>
+
+        <!-- 快捷键 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            全局快捷键
+            <span class="text-xs text-gray-400 font-normal ml-1">(可选)</span>
+          </label>
+          <HotkeyInput
+            v-model="formData.hotkey"
+            placeholder="点击设置快捷键..."
+            :disabled="mode === 'view'"
+            :existing-hotkeys="existingHotkeys"
+            :current-id="mode === 'edit' && shortcut ? shortcut.id : undefined"
+            @conflict="(hasConflict) => (hotkeyConflict = hasConflict)"
+          />
+          <p class="text-xs text-gray-500 mt-1">设置后可通过快捷键快速执行此指令</p>
+        </div>
+
+        <!-- AI 模型 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            AI 模型
+            <span class="text-xs text-gray-400 font-normal ml-1">(可选)</span>
+          </label>
+          <select
+            v-model="formData.model"
+            :disabled="mode === 'view'"
+            class="m-1"
+            :class="
+              mode === 'view'
+                ? 'w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-default'
+                : 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white'
+            "
+          >
+            <option value="">使用默认模型 ({{ defaultModel }})</option>
+            <option v-for="model in availableModels" :key="model" :value="model">
+              {{ model }}
+            </option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">留空则使用全局设置中的默认模型</p>
+        </div>
+
+        <!-- Temperature -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Temperature (温度参数)
+            <span class="text-xs text-gray-400 font-normal ml-1">(可选，默认 0.6)</span>
+          </label>
+          <div class="flex items-center gap-4">
+            <input
+              v-model.number="formData.temperature"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              :disabled="mode === 'view'"
+              class="flex-1"
+              :class="mode === 'view' ? 'opacity-50 cursor-default' : ''"
+            />
+            <input
+              v-model.number="formData.temperature"
+              type="number"
+              min="0"
+              max="2"
+              step="0.1"
+              :readonly="mode === 'view'"
+              :class="
+                mode === 'view'
+                  ? 'w-20 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-default text-center'
+                  : 'w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center'
+              "
+            />
+          </div>
+          <p class="text-xs text-gray-500 mt-1">
+            控制输出的随机性：0 = 确定性，1 = 平衡，2 = 更有创意
+          </p>
         </div>
 
         <!-- 提示词 -->
@@ -140,9 +217,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import EmojiPicker from './EmojiPicker.vue'
+import HotkeyInput from '../../common/HotkeyInput.vue'
+import { useHotkeyConflict } from '../../../composables/useHotkeyConflict'
 import type { AIShortcut, ShortcutCategory } from '../../../stores/aiShortcut'
+
+const { existingHotkeys } = useHotkeyConflict()
+
+// AI 模型相关
+const availableModels = ref<string[]>([])
+const defaultModel = ref<string>('gpt-4o')
 
 interface Props {
   visible: boolean
@@ -150,6 +235,7 @@ interface Props {
   shortcut?: AIShortcut | null
   categories: ShortcutCategory[]
   currentCategoryId?: string
+  closeOnMask?: boolean // 点击遮罩是否关闭
 }
 
 interface Emits {
@@ -160,6 +246,9 @@ interface Emits {
       name: string
       icon: string
       prompt: string
+      hotkey?: string
+      model?: string
+      temperature?: number
       categoryId?: string
     }
   ): void
@@ -170,19 +259,24 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   mode: 'add',
   shortcut: null,
-  currentCategoryId: 'default'
+  currentCategoryId: 'default',
+  closeOnMask: false // 默认点击遮罩不关闭
 })
 
 const emit = defineEmits<Emits>()
 
 const nameInputRef = ref<HTMLInputElement | null>(null)
 const showEmojiPicker = ref(false)
+const hotkeyConflict = ref(false)
 
 // 表单数据
 const formData = ref({
   name: '',
   icon: '⚡',
   prompt: '',
+  hotkey: '',
+  model: '',
+  temperature: 0.6,
   categoryId: 'default'
 })
 
@@ -193,7 +287,12 @@ const availableCategories = computed(() => {
 
 // 表单验证
 const isFormValid = computed(() => {
-  return formData.value.name.trim() !== '' && formData.value.prompt.trim() !== ''
+  const hasRequiredFields = formData.value.name.trim() !== '' && formData.value.prompt.trim() !== ''
+
+  // 如果填写了快捷键，不能有冲突
+  const noHotkeyConflict = !formData.value.hotkey || !hotkeyConflict.value
+
+  return hasRequiredFields && noHotkeyConflict
 })
 
 // 监听 visible 变化，自动聚焦输入框并加载数据
@@ -207,6 +306,9 @@ watch(
           name: props.shortcut.name,
           icon: props.shortcut.icon,
           prompt: props.shortcut.prompt,
+          hotkey: props.shortcut.hotkey || '',
+          model: props.shortcut.model || '',
+          temperature: props.shortcut.temperature ?? 0.6,
           categoryId: props.shortcut.categoryId
         }
       } else {
@@ -217,6 +319,9 @@ watch(
           name: '',
           icon: '⚡',
           prompt: '',
+          hotkey: '',
+          model: '',
+          temperature: 0.6,
           categoryId: categoryId
         }
       }
@@ -241,15 +346,27 @@ function handleEmojiSelect(emoji: string): void {
  * 确认
  */
 function handleConfirm(): void {
-  if (isFormValid.value) {
-    emit('confirm', {
-      name: formData.value.name.trim(),
-      icon: formData.value.icon,
-      prompt: formData.value.prompt.trim(),
-      categoryId: props.mode === 'add' ? formData.value.categoryId : undefined
-    })
-    emit('update:visible', false)
+  if (!isFormValid.value) {
+    return
   }
+
+  // 检查快捷键冲突
+  if (formData.value.hotkey && hotkeyConflict.value) {
+    // 有冲突，不允许提交
+    console.warn('Hotkey conflict detected, cannot save')
+    return
+  }
+
+  emit('confirm', {
+    name: formData.value.name.trim(),
+    icon: formData.value.icon,
+    prompt: formData.value.prompt.trim(),
+    hotkey: formData.value.hotkey || undefined,
+    model: formData.value.model || undefined,
+    temperature: formData.value.temperature,
+    categoryId: props.mode === 'add' ? formData.value.categoryId : undefined
+  })
+  emit('update:visible', false)
 }
 
 /**
@@ -266,6 +383,27 @@ function handleCancel(): void {
 function handleEdit(): void {
   emit('edit')
 }
+
+/**
+ * 点击遮罩
+ */
+function handleMaskClick(): void {
+  if (props.closeOnMask) {
+    handleCancel()
+  }
+}
+
+/**
+ * 初始化加载模型列表
+ */
+onMounted(async () => {
+  if (window.api?.settings?.getAIModels) {
+    availableModels.value = (await window.api.settings.getAIModels()) || []
+  }
+  if (window.api?.settings?.getAIDefaultModel) {
+    defaultModel.value = (await window.api.settings.getAIDefaultModel()) || 'gpt-4o'
+  }
+})
 </script>
 
 <style scoped>

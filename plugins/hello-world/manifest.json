@@ -1,0 +1,34 @@
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "一个简单的 Hello World 示例插件,演示基本插件结构和通知功能",
+  "keywords": ["示例", "通知", "开发"],
+  "author": "Fingertips AI Team",
+  "icon": "mdi:hand-wave",
+  "homepage": "https://github.com/fingertips-ai",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["notification"],
+
+  "ui": {
+    "hasSettings": false,
+    "hasPanel": false
+  },
+
+  "config": {
+    "defaults": {
+      "message": "Hello from Fingertips AI Plugin!"
+    }
+  },
+
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": true
+  }
+}

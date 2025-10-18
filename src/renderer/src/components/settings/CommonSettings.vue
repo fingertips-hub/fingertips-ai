@@ -50,7 +50,10 @@
               v-model="hotkeyValue"
               placeholder="点击输入快捷键..."
               :disabled="hotkeyLoading"
+              :existing-hotkeys="existingHotkeys"
+              current-id="super-panel"
               @update:model-value="handleHotkeyChange"
+              @conflict="(hasConflict) => (hotkeyConflict = hasConflict)"
             />
           </div>
         </div>
@@ -127,6 +130,84 @@
             </div>
           </div>
         </div>
+
+        <!-- 可用模型 -->
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <label class="settings-label">可用模型</label>
+            <p class="settings-description">配置可在快捷指令中使用的 AI 模型列表</p>
+          </div>
+          <div class="settings-item-control">
+            <div class="models-container">
+              <!-- 模型数量提示 -->
+              <div class="models-count">
+                <span class="text-xs text-gray-500">已配置 {{ aiModelsValue.length }} 个模型</span>
+              </div>
+
+              <!-- 模型列表（可滚动区域） -->
+              <div class="models-list-scroll">
+                <div v-for="(_model, index) in aiModelsValue" :key="index" class="model-item">
+                  <div class="model-index">{{ index + 1 }}</div>
+                  <input
+                    v-model="aiModelsValue[index]"
+                    type="text"
+                    class="model-input"
+                    placeholder="例如: gpt-4o"
+                    @blur="handleModelsChange"
+                    @keyup.enter="handleModelsChange"
+                  />
+                  <button
+                    type="button"
+                    class="model-remove-btn"
+                    title="删除此模型"
+                    @click="removeModel(index)"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 添加按钮（固定在底部） -->
+              <button type="button" class="model-add-btn" @click="addModel">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span>添加模型</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 默认模型 -->
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <label class="settings-label">默认模型</label>
+            <p class="settings-description">新建快捷指令时默认使用的模型</p>
+          </div>
+          <div class="settings-item-control">
+            <select
+              v-model="defaultModelValue"
+              class="input-field"
+              @change="handleDefaultModelChange"
+            >
+              <option v-for="model in aiModelsValue" :key="model" :value="model">
+                {{ model }}
+              </option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -140,22 +221,29 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
+import { useAIShortcutStore } from '../../stores/aiShortcut'
+import { useHotkeyConflict } from '../../composables/useHotkeyConflict'
 import Switch from '../common/Switch.vue'
 import HotkeyInput from '../common/HotkeyInput.vue'
 import FilePathSelector from '../common/FilePathSelector.vue'
 
 const settingsStore = useSettingsStore()
+const aiShortcutStore = useAIShortcutStore()
+const { existingHotkeys } = useHotkeyConflict()
 
 // 本地状态 - 通用设置
 const autoLaunchValue = ref(false)
 const autoLaunchLoading = ref(false)
 const hotkeyValue = ref('')
 const hotkeyLoading = ref(false)
+const hotkeyConflict = ref(false)
 
 // 本地状态 - AI 设置
 const baseUrlValue = ref('')
 const apiKeyValue = ref('')
 const showApiKey = ref(false)
+const aiModelsValue = ref<string[]>([])
+const defaultModelValue = ref('')
 
 // Toast 提示
 const toast = ref({
@@ -214,6 +302,14 @@ async function handleAutoLaunchChange(value: boolean): Promise<void> {
 async function handleHotkeyChange(value: string): Promise<void> {
   if (!value) return
 
+  // 检查是否有冲突
+  if (hotkeyConflict.value) {
+    showToast('该快捷键已被使用，请选择其他快捷键', 'error')
+    // 恢复原值
+    hotkeyValue.value = settingsStore.settings.hotkey
+    return
+  }
+
   hotkeyLoading.value = true
   try {
     const success = await settingsStore.updateHotkey(value)
@@ -237,22 +333,99 @@ async function handleHotkeyChange(value: string): Promise<void> {
 /**
  * 处理 Base URL 变更
  */
-function handleBaseUrlChange(): void {
+async function handleBaseUrlChange(): Promise<void> {
   const trimmedValue = baseUrlValue.value.trim()
   if (trimmedValue !== settingsStore.settings.aiBaseUrl) {
-    settingsStore.updateAIBaseUrl(trimmedValue)
-    showToast('Base URL 已保存')
+    const success = await settingsStore.updateAIBaseUrl(trimmedValue)
+    if (success) {
+      showToast('Base URL 已保存')
+    } else {
+      showToast('Base URL 保存失败，请重试', 'error')
+    }
   }
 }
 
 /**
  * 处理 API Key 变更
  */
-function handleApiKeyChange(): void {
+async function handleApiKeyChange(): Promise<void> {
   const trimmedValue = apiKeyValue.value.trim()
   if (trimmedValue !== settingsStore.settings.aiApiKey) {
-    settingsStore.updateAIApiKey(trimmedValue)
-    showToast('API Key 已保存')
+    const success = await settingsStore.updateAIApiKey(trimmedValue)
+    if (success) {
+      showToast('API Key 已保存')
+    } else {
+      showToast('API Key 保存失败，请重试', 'error')
+    }
+  }
+}
+
+/**
+ * 添加模型
+ */
+function addModel(): void {
+  aiModelsValue.value.push('')
+}
+
+/**
+ * 删除模型
+ */
+function removeModel(index: number): void {
+  if (aiModelsValue.value.length <= 1) {
+    showToast('至少保留一个模型', 'error')
+    return
+  }
+  const removedModel = aiModelsValue.value[index]
+  aiModelsValue.value.splice(index, 1)
+
+  // 如果删除的是默认模型，将第一个模型设为默认
+  if (removedModel === defaultModelValue.value && aiModelsValue.value.length > 0) {
+    defaultModelValue.value = aiModelsValue.value[0]
+    void handleDefaultModelChange()
+  }
+
+  void handleModelsChange()
+}
+
+/**
+ * 处理模型列表变更
+ */
+async function handleModelsChange(): Promise<void> {
+  // 过滤空值
+  const validModels = aiModelsValue.value.filter((m) => m.trim())
+  if (validModels.length === 0) {
+    showToast('至少需要一个有效的模型', 'error')
+    return
+  }
+
+  aiModelsValue.value = validModels
+
+  if (window.api?.settings?.setAIModels) {
+    const success = await window.api.settings.setAIModels(validModels)
+    if (success) {
+      showToast('模型列表已保存')
+      // 如果当前默认模型不在列表中，设置第一个为默认
+      if (!validModels.includes(defaultModelValue.value)) {
+        defaultModelValue.value = validModels[0]
+        await handleDefaultModelChange()
+      }
+    } else {
+      showToast('模型列表保存失败，请重试', 'error')
+    }
+  }
+}
+
+/**
+ * 处理默认模型变更
+ */
+async function handleDefaultModelChange(): Promise<void> {
+  if (window.api?.settings?.setAIDefaultModel) {
+    const success = await window.api.settings.setAIDefaultModel(defaultModelValue.value)
+    if (success) {
+      showToast('默认模型已更新')
+    } else {
+      showToast('默认模型更新失败，请重试', 'error')
+    }
   }
 }
 
@@ -261,12 +434,27 @@ function handleApiKeyChange(): void {
  */
 onMounted(async () => {
   await settingsStore.initialize()
-  // 初始化通用设置
+
+  // 初始化 AI Shortcut Store（用于冲突检测）
+  aiShortcutStore.initialize()
+
+  // 初始化通用设置（从 store 读取）
   autoLaunchValue.value = settingsStore.settings.autoLaunch
   hotkeyValue.value = settingsStore.settings.hotkey
-  // 初始化 AI 设置
-  baseUrlValue.value = settingsStore.settings.aiBaseUrl
-  apiKeyValue.value = settingsStore.settings.aiApiKey
+
+  // 初始化 AI 设置（从主进程 electron-store 读取）
+  if (window.api?.settings?.getAIBaseUrl) {
+    baseUrlValue.value = (await window.api.settings.getAIBaseUrl()) || ''
+  }
+  if (window.api?.settings?.getAIApiKey) {
+    apiKeyValue.value = (await window.api.settings.getAIApiKey()) || ''
+  }
+  if (window.api?.settings?.getAIModels) {
+    aiModelsValue.value = (await window.api.settings.getAIModels()) || []
+  }
+  if (window.api?.settings?.getAIDefaultModel) {
+    defaultModelValue.value = (await window.api.settings.getAIDefaultModel()) || 'gpt-4o'
+  }
 })
 </script>
 
@@ -447,6 +635,169 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 模型容器样式 */
+.models-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* 模型数量提示 */
+.models-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+/* 模型列表滚动区域 */
+.models-list-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+/* 自定义滚动条 */
+.models-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.models-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.models-list-scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.models-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 模型项 */
+.model-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.model-item:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 模型序号 */
+.model-index {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+/* 模型输入框 */
+.model-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  color: #374151;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.model-input::placeholder {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.model-input:hover {
+  border-color: #d1d5db;
+}
+
+.model-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 删除按钮 */
+.model-remove-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.model-remove-btn:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.model-remove-btn:active {
+  transform: scale(0.95);
+}
+
+/* 添加按钮 */
+.model-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.model-add-btn:hover {
+  border-color: #3b82f6;
+  border-style: solid;
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.model-add-btn:active {
+  transform: scale(0.98);
 }
 
 /* 响应式设计 */

@@ -6,6 +6,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import Settings from './Settings.vue'
 import CommonSettings from './components/settings/CommonSettings.vue'
 import AISettings from './components/settings/AIShortcut.vue'
+import PluginManager from './components/settings/PluginManager.vue'
 
 // 创建路由器
 const router = createRouter({
@@ -24,6 +25,11 @@ const router = createRouter({
       path: '/ai',
       name: 'ai',
       component: AISettings
+    },
+    {
+      path: '/plugins',
+      name: 'plugins',
+      component: PluginManager
     }
   ]
 })

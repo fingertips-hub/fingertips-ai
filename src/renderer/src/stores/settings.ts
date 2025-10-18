@@ -4,7 +4,7 @@ import { ref } from 'vue'
 const STORAGE_KEY = 'fingertips-settings'
 
 /**
- * 应用设置接口
+ * 应用设置接口（localStorage 缓存的设置）
  */
 export interface AppSettings {
   // 通用设置
@@ -12,7 +12,7 @@ export interface AppSettings {
   autoLaunch: boolean // 开机自启动
   hotkey: string // 召唤 Super Panel 的快捷键
 
-  // AI 设置
+  // AI 设置（只用于 UI 展示，不存储到 localStorage）
   aiBaseUrl: string // AI Base URL
   aiApiKey: string // AI API Key
 }
@@ -26,8 +26,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoLaunch: false,
   hotkey: 'LongPress:Middle', // 默认快捷键：长按中键
 
-  // AI 设置
-  aiBaseUrl: 'https://api.openai.com/v1',
+  // AI 设置（只是占位符）
+  aiBaseUrl: '',
   aiApiKey: ''
 }
 
@@ -41,16 +41,22 @@ export const useSettingsStore = defineStore('settings', () => {
   const isLoading = ref(false)
 
   /**
-   * 初始化 Store - 从 localStorage 加载数据
+   * 初始化 Store
+   * - 通用设置从 localStorage 加载
+   * - AI 设置从主进程（electron-store）加载
    */
   async function initialize(): Promise<void> {
     isLoading.value = true
     try {
+      // 1. 从 localStorage 加载通用设置
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        const data = JSON.parse(stored) as AppSettings
-        // 合并默认值和存储值，确保新增字段有默认值
-        settings.value = { ...DEFAULT_SETTINGS, ...data }
+        const data = JSON.parse(stored) as Partial<AppSettings>
+        // 只加载通用设置，排除 AI 设置
+        if (data.storageDirectory !== undefined)
+          settings.value.storageDirectory = data.storageDirectory
+        if (data.autoLaunch !== undefined) settings.value.autoLaunch = data.autoLaunch
+        if (data.hotkey !== undefined) settings.value.hotkey = data.hotkey
       } else {
         // 首次运行，获取默认存储目录
         if (window.api?.settings?.getDefaultStorageDirectory) {
@@ -65,7 +71,7 @@ export const useSettingsStore = defineStore('settings', () => {
         saveToStorage()
       }
 
-      // 从主进程同步快捷键设置（主进程是真实的数据源）
+      // 2. 从主进程同步快捷键设置（主进程是权威数据源）
       if (window.api?.settings?.getHotkey) {
         const savedHotkey = await window.api.settings.getHotkey()
         if (savedHotkey && savedHotkey !== settings.value.hotkey) {
@@ -74,19 +80,39 @@ export const useSettingsStore = defineStore('settings', () => {
           console.log('Synced hotkey from main process:', savedHotkey)
         }
       }
+
+      // 3. 从主进程加载 AI 设置（不使用 localStorage）
+      if (window.api?.settings?.getAIBaseUrl) {
+        const savedBaseUrl = await window.api.settings.getAIBaseUrl()
+        settings.value.aiBaseUrl = savedBaseUrl || ''
+        console.log('Loaded AI Base URL from main process:', savedBaseUrl || '(empty)')
+      }
+
+      if (window.api?.settings?.getAIApiKey) {
+        const savedApiKey = await window.api.settings.getAIApiKey()
+        settings.value.aiApiKey = savedApiKey || ''
+        console.log('Loaded AI API Key from main process:', savedApiKey ? '***' : '(empty)')
+      }
     } catch (error) {
-      console.error('Failed to load settings from localStorage:', error)
+      console.error('Failed to initialize settings:', error)
     } finally {
       isLoading.value = false
     }
   }
 
   /**
-   * 保存数据到 localStorage
+   * 保存通用设置到 localStorage
+   * 注意：AI 设置不保存到 localStorage，只存储在主进程的 electron-store
    */
   function saveToStorage(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value))
+      const dataToSave = {
+        storageDirectory: settings.value.storageDirectory,
+        autoLaunch: settings.value.autoLaunch,
+        hotkey: settings.value.hotkey
+        // 不包含 aiBaseUrl 和 aiApiKey
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error)
     }
@@ -176,18 +202,56 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /**
    * 更新 AI Base URL
+   * 直接保存到主进程的 electron-store，不使用 localStorage
    */
-  function updateAIBaseUrl(url: string): void {
-    settings.value.aiBaseUrl = url
-    saveToStorage()
+  async function updateAIBaseUrl(url: string): Promise<boolean> {
+    try {
+      if (!window.api?.settings?.setAIBaseUrl) {
+        console.error('setAIBaseUrl API not available')
+        return false
+      }
+
+      const success = await window.api.settings.setAIBaseUrl(url)
+      if (success) {
+        // 更新本地展示值（仅用于 UI 展示）
+        settings.value.aiBaseUrl = url
+        console.log('AI Base URL updated successfully in electron-store')
+        return true
+      } else {
+        console.error('Failed to update AI Base URL in main process')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to update AI Base URL:', error)
+      return false
+    }
   }
 
   /**
    * 更新 AI API Key
+   * 直接保存到主进程的 electron-store，不使用 localStorage
    */
-  function updateAIApiKey(key: string): void {
-    settings.value.aiApiKey = key
-    saveToStorage()
+  async function updateAIApiKey(key: string): Promise<boolean> {
+    try {
+      if (!window.api?.settings?.setAIApiKey) {
+        console.error('setAIApiKey API not available')
+        return false
+      }
+
+      const success = await window.api.settings.setAIApiKey(key)
+      if (success) {
+        // 更新本地展示值（仅用于 UI 展示）
+        settings.value.aiApiKey = key
+        console.log('AI API Key updated successfully in electron-store')
+        return true
+      } else {
+        console.error('Failed to update AI API Key in main process')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to update AI API Key:', error)
+      return false
+    }
   }
 
   /**

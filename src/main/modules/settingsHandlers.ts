@@ -1,7 +1,7 @@
 import { app, dialog, ipcMain, BrowserWindow } from 'electron'
 import { getSettingsWindow } from './Settings'
 import { parseTriggerConfig } from './mouseListener'
-import { getHotkey, setHotkey } from './settingsStore'
+import { getHotkey, setHotkey, getSetting, setSetting } from './settingsStore'
 
 // 存储当前注册的触发器（快捷键或鼠标动作）
 let currentTrigger: string | null = null
@@ -18,6 +18,70 @@ export function setupSettingsHandlers(): void {
   // 获取当前快捷键设置
   ipcMain.handle('settings:get-hotkey', async () => {
     return await getHotkey()
+  })
+
+  // 获取 AI Base URL
+  ipcMain.handle('settings:get-ai-base-url', async () => {
+    return await getSetting('aiBaseUrl')
+  })
+
+  // 设置 AI Base URL
+  ipcMain.handle('settings:set-ai-base-url', async (_event, url: string) => {
+    try {
+      await setSetting('aiBaseUrl', url)
+      return true
+    } catch (error) {
+      console.error('Failed to set AI Base URL:', error)
+      return false
+    }
+  })
+
+  // 获取 AI API Key
+  ipcMain.handle('settings:get-ai-api-key', async () => {
+    return await getSetting('aiApiKey')
+  })
+
+  // 设置 AI API Key
+  ipcMain.handle('settings:set-ai-api-key', async (_event, key: string) => {
+    try {
+      await setSetting('aiApiKey', key)
+      return true
+    } catch (error) {
+      console.error('Failed to set AI API Key:', error)
+      return false
+    }
+  })
+
+  // 获取 AI 模型列表
+  ipcMain.handle('settings:get-ai-models', async () => {
+    return await getSetting('aiModels')
+  })
+
+  // 设置 AI 模型列表
+  ipcMain.handle('settings:set-ai-models', async (_event, models: string[]) => {
+    try {
+      await setSetting('aiModels', models)
+      return true
+    } catch (error) {
+      console.error('Failed to set AI models:', error)
+      return false
+    }
+  })
+
+  // 获取默认 AI 模型
+  ipcMain.handle('settings:get-ai-default-model', async () => {
+    return await getSetting('aiDefaultModel')
+  })
+
+  // 设置默认 AI 模型
+  ipcMain.handle('settings:set-ai-default-model', async (_event, model: string) => {
+    try {
+      await setSetting('aiDefaultModel', model)
+      return true
+    } catch (error) {
+      console.error('Failed to set default AI model:', error)
+      return false
+    }
   })
 
   // 选择文件夹
@@ -146,6 +210,10 @@ export function cleanupSettingsHandlers(): void {
   ipcMain.removeHandler('settings:set-auto-launch')
   ipcMain.removeHandler('settings:register-hotkey')
   ipcMain.removeHandler('settings:unregister-hotkey')
+  ipcMain.removeHandler('settings:get-ai-base-url')
+  ipcMain.removeHandler('settings:set-ai-base-url')
+  ipcMain.removeHandler('settings:get-ai-api-key')
+  ipcMain.removeHandler('settings:set-ai-api-key')
 }
 
 /**

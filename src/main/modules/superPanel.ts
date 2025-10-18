@@ -3,7 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../../resources/icon.png?asset'
 import { calculateWindowPosition } from '../utils/windowPosition'
-import { getCapturedTextOnPress } from './mouseListener'
+import { getCapturedTextOnPress, clearCapturedText } from './mouseListener'
 
 // Super Panel window instance
 let superPanelWindow: BrowserWindow | null = null
@@ -130,6 +130,9 @@ export function hideSuperPanel(): void {
     // 重置固定状态,下次打开时恢复默认行为
     isPinned = false
     console.log('Pinned state reset to false')
+    // 清空捕获的文本缓存，准备下次使用
+    clearCapturedText()
+    console.log('Captured text cache cleared')
   }
 }
 

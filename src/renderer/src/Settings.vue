@@ -45,6 +45,11 @@ const menuItems = [
     path: '/ai',
     label: 'AI快捷指令',
     icon: 'mdi:lightning-bolt'
+  },
+  {
+    path: '/plugins',
+    label: '插件',
+    icon: 'mdi:puzzle'
   }
 ]
 </script>

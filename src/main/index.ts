@@ -15,6 +15,12 @@ import {
   initializeDefaultHotkey
 } from './modules/settingsHandlers'
 import { registerAIShortcutRunnerHandlers } from './modules/aiShortcutRunnerHandlers'
+import {
+  registerCmdGeneratorHandlers,
+  cleanupCmdGeneratorHandlers
+} from './modules/cmdGeneratorHandlers'
+import { pluginManager } from './modules/pluginManager'
+import { setupPluginHandlers, cleanupPluginHandlers } from './modules/pluginHandlers'
 
 // =============================================================================
 // 单实例锁定 - Single Instance Lock
@@ -44,6 +50,39 @@ if (is.dev) {
   app.setPath('userData', userDataPath)
   console.log('Development mode: Using userData path:', userDataPath)
 }
+
+// =============================================================================
+// 全局异常处理 - Global Exception Handling
+// =============================================================================
+// 🔑 关键安全措施：捕获未处理的异常，确保即使程序崩溃也能清理 uiohook
+process.on('uncaughtException', (error) => {
+  console.error('===============================================')
+  console.error('💥 Uncaught Exception:', error)
+  console.error('===============================================')
+
+  // 立即停止 uiohook，防止键盘被锁定
+  try {
+    console.error('[Emergency] Stopping global mouse listener...')
+    stopGlobalMouseListener()
+    console.error('[Emergency] ✓ Global mouse listener stopped')
+  } catch (err) {
+    console.error('[Emergency] ✗ Failed to stop mouse listener:', err)
+  }
+
+  // 给一点时间让清理完成
+  setTimeout(() => {
+    process.exit(1)
+  }, 100)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('===============================================')
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason)
+  console.error('===============================================')
+
+  // Promise rejection 通常不会导致程序崩溃，但我们仍然记录日志
+  // 不需要停止 uiohook，除非这是一个严重错误
+})
 
 // =============================================================================
 // 命令行开关 - Command Line Switches
@@ -142,6 +181,17 @@ app.whenReady().then(() => {
   // Register AI Shortcut Runner IPC handlers
   registerAIShortcutRunnerHandlers()
 
+  // Register CMD Generator IPC handlers
+  registerCmdGeneratorHandlers()
+
+  // Setup Plugin System
+  setupPluginHandlers()
+
+  // Initialize Plugin Manager (异步)
+  pluginManager.initialize().catch((error) => {
+    console.error('Failed to initialize plugin manager:', error)
+  })
+
   // Initialize default hotkey (异步)
   initializeDefaultHotkey().catch((error) => {
     console.error('Failed to initialize default hotkey:', error)
@@ -178,14 +228,62 @@ app.on('window-all-closed', () => {
 
 // Cleanup before quit
 app.on('before-quit', () => {
-  // Stop the global mouse hook
-  stopGlobalMouseListener()
+  console.log('===============================================')
+  console.log('Application is about to quit, cleaning up...')
+  console.log('===============================================')
+
+  // 🔑 关键：停止全局鼠标/键盘监听器
+  // 这是最重要的清理步骤，必须确保 uiohook 被正确停止
+  try {
+    console.log('[Cleanup] Stopping global mouse listener...')
+    stopGlobalMouseListener()
+    console.log('[Cleanup] ✓ Global mouse listener stopped successfully')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error stopping global mouse listener:', error)
+  }
 
   // Cleanup Super Panel IPC handlers
-  cleanupSuperPanelHandlers()
+  try {
+    console.log('[Cleanup] Cleaning up Super Panel handlers...')
+    cleanupSuperPanelHandlers()
+    console.log('[Cleanup] ✓ Super Panel handlers cleaned up')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error cleaning up Super Panel handlers:', error)
+  }
 
   // Cleanup Settings IPC handlers
-  cleanupSettingsHandlers()
+  try {
+    console.log('[Cleanup] Cleaning up Settings handlers...')
+    cleanupSettingsHandlers()
+    console.log('[Cleanup] ✓ Settings handlers cleaned up')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error cleaning up Settings handlers:', error)
+  }
+
+  // Cleanup CMD Generator IPC handlers
+  try {
+    console.log('[Cleanup] Cleaning up CMD Generator handlers...')
+    cleanupCmdGeneratorHandlers()
+    console.log('[Cleanup] ✓ CMD Generator handlers cleaned up')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error cleaning up CMD Generator handlers:', error)
+  }
+
+  // Cleanup Plugin System
+  try {
+    console.log('[Cleanup] Cleaning up Plugin System...')
+    cleanupPluginHandlers()
+    pluginManager.cleanup().catch((error) => {
+      console.error('[Cleanup] ✗ Failed to cleanup plugin manager:', error)
+    })
+    console.log('[Cleanup] ✓ Plugin System cleaned up')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error cleaning up Plugin System:', error)
+  }
+
+  console.log('===============================================')
+  console.log('Application cleanup completed')
+  console.log('===============================================')
 })
 
 // In this file you can include the rest of your app's specific main process

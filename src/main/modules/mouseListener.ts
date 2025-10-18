@@ -7,6 +7,11 @@ import {
   isPinnedState
 } from './superPanel'
 import { captureSelectedText } from './aiShortcutRunner'
+import {
+  checkShortcutHotkeyTriggered,
+  triggerShortcut,
+  updateActiveModifiers
+} from './aiShortcutHotkeyManager'
 
 // Mouse listener state
 let middleButtonPressTime: number | null = null
@@ -170,12 +175,19 @@ function cancelLongPress(): void {
 
 /**
  * 获取按键时捕获的文本
+ * 注意：不会立即清空缓存，而是在下次捕获时覆盖
+ * 这样可以保证 Super Panel 显示期间，多次获取都能拿到同一份文本
  */
 export function getCapturedTextOnPress(): string {
-  const text = capturedTextOnPress
-  // 返回后清空，避免重复使用
+  return capturedTextOnPress
+}
+
+/**
+ * 清空捕获的文本缓存
+ * 在 Super Panel 隐藏或下次捕获时调用
+ */
+export function clearCapturedText(): void {
   capturedTextOnPress = ''
-  return text
 }
 
 /**
@@ -205,17 +217,22 @@ function handleButtonDown(button: number, x: number, y: number): void {
   // 🔑 关键优化：在按键的瞬间就立即尝试捕获选中文本
   // 这时选中状态通常还没有丢失（取决于鼠标位置）
   console.log('[MouseListener] 立即尝试捕获选中文本（在按下瞬间）...')
-  captureSelectedText()
-    .then((text) => {
-      capturedTextOnPress = text
-      console.log('[MouseListener] 按下时捕获的文本长度:', text.length)
-      if (text.length > 0) {
-        console.log('[MouseListener] 捕获成功:', text.substring(0, 50))
+
+  // 🎯 使用立即执行的异步函数，避免阻塞
+  ;(async () => {
+    try {
+      // 清空旧的缓存，准备捕获新内容
+      capturedTextOnPress = ''
+      capturedTextOnPress = await captureSelectedText()
+      console.log('[MouseListener] 按下时捕获的文本长度:', capturedTextOnPress.length)
+      if (capturedTextOnPress.length > 0) {
+        console.log('[MouseListener] 捕获成功:', capturedTextOnPress.substring(0, 50))
       }
-    })
-    .catch((err) => {
+    } catch (err) {
       console.error('[MouseListener] 捕获失败:', err)
-    })
+      capturedTextOnPress = ''
+    }
+  })()
 
   // 设置定时器,达到阈值后显示面板
   longPressTimer = setTimeout(() => {
@@ -301,33 +318,48 @@ export function setupGlobalMouseListener(): void {
     const modifierName = KEY_CODE_TO_MODIFIER[event.keycode]
     if (modifierName) {
       activeModifiers.add(modifierName)
+      // 更新 AI 快捷指令管理器中的修饰键状态
+      updateActiveModifiers(activeModifiers)
       // console.log(`Modifier pressed: ${modifierName}, active: ${Array.from(activeModifiers).join('+')}`)
       return
     }
 
-    // 🔑 检测键盘快捷键触发（例如 Alt+Q）
+    // 🔑 优先检测 AI 快捷指令的快捷键
+    const shortcutInfo = checkShortcutHotkeyTriggered(event.keycode, activeModifiers)
+    if (shortcutInfo) {
+      console.log(`[MouseListener] AI Shortcut hotkey detected: ${shortcutInfo.name}`)
+      // 异步触发快捷指令（包括捕获文本和打开运行器）
+      triggerShortcut(shortcutInfo).catch((err) => {
+        console.error('[MouseListener] Failed to trigger shortcut:', err)
+      })
+      return // 不再检测 Super Panel 快捷键
+    }
+
+    // 🔑 检测 Super Panel 快捷键触发（例如 Alt+Q）
     if (currentTriggerKey !== null && event.keycode === currentTriggerKey) {
       if (checkModifiersMatch()) {
         console.log(`Keyboard trigger detected: ${currentTrigger}`)
-        console.log('[MouseListener] 键盘快捷键触发，立即捕获选中文本...')
+        console.log('[MouseListener] 快速捕获选中文本并显示 Super Panel...')
 
-        // 立即捕获选中文本（异步，不阻塞）
-        captureSelectedText()
-          .then((text) => {
-            capturedTextOnPress = text
-            console.log('[MouseListener] 捕获的文本长度:', text.length)
-            if (text.length > 0) {
-              console.log('[MouseListener] 捕获成功:', text.substring(0, 50))
+        // 🚀 性能优化：快速捕获后立即显示
+        ;(async () => {
+          try {
+            // 清空旧的缓存，准备捕获新内容
+            capturedTextOnPress = ''
+            capturedTextOnPress = await captureSelectedText()
+            console.log('[MouseListener] 捕获完成，文本长度:', capturedTextOnPress.length)
+            if (capturedTextOnPress.length > 0) {
+              console.log('[MouseListener] 捕获成功:', capturedTextOnPress.substring(0, 50))
             }
-          })
-          .catch((err) => {
+          } catch (err) {
             console.error('[MouseListener] 捕获失败:', err)
-          })
-
-        // 短延迟后显示 Super Panel（给捕获时间）
-        setTimeout(() => {
-          showSuperPanelAtMouse()
-        }, 100)
+            capturedTextOnPress = ''
+          } finally {
+            // 无论捕获成功还是失败，都立即显示 Super Panel
+            console.log('[MouseListener] 显示 Super Panel')
+            showSuperPanelAtMouse()
+          }
+        })()
       }
     }
   })
@@ -336,6 +368,8 @@ export function setupGlobalMouseListener(): void {
     const modifierName = KEY_CODE_TO_MODIFIER[event.keycode]
     if (modifierName) {
       activeModifiers.delete(modifierName)
+      // 更新 AI 快捷指令管理器中的修饰键状态
+      updateActiveModifiers(activeModifiers)
       // console.log(`Modifier released: ${modifierName}, active: ${Array.from(activeModifiers).join('+')}`)
     }
   })

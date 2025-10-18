@@ -82,7 +82,7 @@ interface Emits {
   (e: 'contextmenu-card', event: { shortcut: AIShortcut; x: number; y: number }): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 /**

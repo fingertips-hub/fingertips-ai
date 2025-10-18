@@ -6,7 +6,12 @@
       :value="displayValue"
       :placeholder="placeholder"
       readonly
-      :class="['hotkey-input', isRecording ? 'recording' : '', disabled ? 'disabled' : '']"
+      :class="[
+        'hotkey-input',
+        isRecording ? 'recording' : '',
+        disabled ? 'disabled' : '',
+        hasConflict ? 'conflict' : ''
+      ]"
       :disabled="disabled"
       @click="startRecording"
       @blur="stopRecording"
@@ -18,6 +23,9 @@
     <div v-if="isRecording" class="recording-hint">
       请按下键盘快捷键或长按鼠标按键（{{ Math.floor(recordingTime / 100) * 100 }}ms）
     </div>
+    <div v-if="hasConflict && !isRecording" class="conflict-hint">
+      ⚠️ 该快捷键已被使用：{{ conflictInfo }}
+    </div>
   </div>
 </template>
 
@@ -28,15 +36,22 @@ const props = defineProps<{
   modelValue: string
   placeholder?: string
   disabled?: boolean
+  // 已存在的快捷键列表（用于冲突检测）
+  existingHotkeys?: Array<{ hotkey: string; name: string; id?: string }>
+  // 当前编辑的 ID（用于排除自身）
+  currentId?: string
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  conflict: [hasConflict: boolean]
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const isRecording = ref(false)
 const recordedKeys = ref<Set<string>>(new Set())
+const hasConflict = ref(false)
+const conflictInfo = ref('')
 
 // 鼠标长按相关状态
 const mouseDownButton = ref<number | null>(null)
@@ -95,6 +110,40 @@ const displayValue = computed(() => {
 })
 
 /**
+ * 检测快捷键冲突
+ */
+function checkConflict(hotkey: string): boolean {
+  if (!hotkey || !props.existingHotkeys || props.existingHotkeys.length === 0) {
+    hasConflict.value = false
+    conflictInfo.value = ''
+    emit('conflict', false)
+    return false
+  }
+
+  // 查找冲突的快捷键
+  const conflict = props.existingHotkeys.find((item) => {
+    // 排除当前编辑的快捷键（通过 ID）
+    if (props.currentId && item.id === props.currentId) {
+      return false
+    }
+    // 比较快捷键（忽略大小写）
+    return item.hotkey && item.hotkey.toLowerCase() === hotkey.toLowerCase()
+  })
+
+  if (conflict) {
+    hasConflict.value = true
+    conflictInfo.value = conflict.name
+    emit('conflict', true)
+    return true
+  } else {
+    hasConflict.value = false
+    conflictInfo.value = ''
+    emit('conflict', false)
+    return false
+  }
+}
+
+/**
  * 开始录制快捷键
  */
 function startRecording(): void {
@@ -105,6 +154,9 @@ function startRecording(): void {
   mouseDownTime.value = 0
   recordingTime.value = 0
   currentModifiers.value = []
+  // 清除之前的冲突提示
+  hasConflict.value = false
+  conflictInfo.value = ''
 }
 
 /**
@@ -215,7 +267,12 @@ function handleLongPress(button: number): void {
 
   console.log('Long press detected:', hotkey)
 
+  // 检测冲突
+  checkConflict(hotkey)
+
+  // 即使有冲突也更新值，由父组件决定是否允许保存
   emit('update:modelValue', hotkey)
+
   isRecording.value = false
   inputRef.value?.blur()
   cleanupMousePress()
@@ -248,12 +305,18 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   // 处理特殊键
   let keyName = key
+  let isFunctionKey = false
+
   if (code.startsWith('Key')) {
     // 字母键
     keyName = code.substring(3) // KeyA -> A
   } else if (code.startsWith('Digit')) {
     // 数字键
     keyName = code.substring(5) // Digit1 -> 1
+  } else if (code.startsWith('F') && code.length <= 3) {
+    // 功能键 F1-F12
+    keyName = code // F1, F2, ..., F12
+    isFunctionKey = true
   } else if (key === ' ') {
     keyName = 'Space'
   } else if (key === 'Escape') {
@@ -266,13 +329,31 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   const hotkey = parts.join('+')
 
-  // 必须包含至少一个修饰键
-  if (parts.length > 1) {
+  // 功能键（F1-F12）可以单独使用，其他键必须包含至少一个修饰键
+  const canUseAlone = isFunctionKey
+  if (parts.length > 1 || canUseAlone) {
+    // 检测冲突
+    checkConflict(hotkey)
+
+    // 即使有冲突也更新值，由父组件决定是否允许保存
     emit('update:modelValue', hotkey)
+
     isRecording.value = false
     inputRef.value?.blur()
   }
 }
+
+/**
+ * 手动触发冲突检测（用于外部调用）
+ */
+function validateConflict(): boolean {
+  return checkConflict(props.modelValue)
+}
+
+// 暴露方法给父组件
+defineExpose({
+  validateConflict
+})
 
 // 组件卸载时清理
 onUnmounted(() => {
@@ -320,6 +401,11 @@ onUnmounted(() => {
   color: #9ca3af;
 }
 
+.hotkey-input.conflict {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
 .recording-hint {
   position: absolute;
   top: 100%;
@@ -327,6 +413,21 @@ onUnmounted(() => {
   margin-top: 4px;
   padding: 4px 8px;
   background: #1f2937;
+  color: white;
+  font-size: 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease;
+  z-index: 10;
+}
+
+.conflict-hint {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #f59e0b;
   color: white;
   font-size: 12px;
   border-radius: 4px;

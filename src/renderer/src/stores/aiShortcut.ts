@@ -23,6 +23,9 @@ export interface AIShortcut {
   name: string // 指令名称
   icon: string // emoji 图标
   prompt: string // 提示词内容
+  hotkey?: string // 全局快捷键（可选）
+  model?: string // AI 模型（可选，默认使用全局配置）
+  temperature?: number // 温度参数 0-2.0（可选，默认 1.0）
   createdAt: number // 创建时间
   updatedAt: number // 更新时间
   order: number // 排序
@@ -203,7 +206,10 @@ export const useAIShortcutStore = defineStore('aiShortcut', () => {
     name: string,
     icon: string,
     prompt: string,
-    categoryId?: string
+    categoryId?: string,
+    hotkey?: string,
+    model?: string,
+    temperature?: number
   ): AIShortcut {
     // 如果没有指定分类或分类为"all"，使用默认分类
     let targetCategoryId = categoryId || selectedCategoryId.value
@@ -217,6 +223,9 @@ export const useAIShortcutStore = defineStore('aiShortcut', () => {
       name,
       icon,
       prompt,
+      hotkey,
+      model,
+      temperature,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       order: shortcuts.value.filter((s) => s.categoryId === targetCategoryId).length

@@ -1,6 +1,12 @@
 import { ipcMain, dialog, shell } from 'electron'
 import { basename, extname } from 'path'
-import { getSuperPanelWindow, hideSuperPanel, setModalOpen, setPinned } from './superPanel'
+import {
+  getSuperPanelWindow,
+  hideSuperPanel,
+  setModalOpen,
+  setPinned,
+  getCachedSelectedText
+} from './superPanel'
 import { extractIcon } from '../utils/iconExtractor'
 
 /**
@@ -42,6 +48,14 @@ export function setupSuperPanelHandlers(): void {
    */
   ipcMain.on('super-panel:set-pinned', (_event, pinned: boolean) => {
     setPinned(pinned)
+  })
+
+  /**
+   * 获取捕获的选中文本
+   * 用于将划词内容传递给插件
+   */
+  ipcMain.handle('super-panel:get-captured-text', () => {
+    return getCachedSelectedText()
   })
 
   // =============================================================================

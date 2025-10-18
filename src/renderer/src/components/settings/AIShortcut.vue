@@ -205,7 +205,12 @@ function handleDeleteShortcut(shortcut: AIShortcut): void {
   confirmDialogTitle.value = '删除快捷指令'
   confirmDialogMessage.value = `确定要删除快捷指令"${shortcut.name}"吗？`
   confirmDialogType.value = 'danger'
-  confirmDialogCallback.value = () => {
+  confirmDialogCallback.value = async () => {
+    // 先注销快捷键
+    if (shortcut.hotkey) {
+      await window.api.aiShortcutHotkey.unregister(shortcut.id)
+    }
+    // 删除快捷指令
     store.deleteShortcut(shortcut.id)
   }
   confirmDialogVisible.value = true
@@ -214,20 +219,68 @@ function handleDeleteShortcut(shortcut: AIShortcut): void {
 /**
  * 快捷指令对话框确认
  */
-function handleShortcutConfirm(data: {
+async function handleShortcutConfirm(data: {
   name: string
   icon: string
   prompt: string
+  hotkey?: string
+  model?: string
+  temperature?: number
   categoryId?: string
-}): void {
+}): Promise<void> {
   if (shortcutDialogMode.value === 'add') {
-    store.addShortcut(data.name, data.icon, data.prompt, data.categoryId)
+    const newShortcut = store.addShortcut(
+      data.name,
+      data.icon,
+      data.prompt,
+      data.categoryId,
+      data.hotkey,
+      data.model,
+      data.temperature
+    )
+    // 如果设置了快捷键，注册到主进程
+    if (data.hotkey && newShortcut) {
+      await window.api.aiShortcutHotkey.register(
+        newShortcut.id,
+        data.hotkey,
+        newShortcut.name,
+        newShortcut.icon,
+        newShortcut.prompt,
+        data.model,
+        data.temperature
+      )
+    }
   } else if (currentEditingShortcut.value) {
-    store.updateShortcut(currentEditingShortcut.value.id, {
+    const oldHotkey = currentEditingShortcut.value.hotkey
+    const shortcutId = currentEditingShortcut.value.id
+
+    // 先注销旧快捷键
+    if (oldHotkey) {
+      await window.api.aiShortcutHotkey.unregister(shortcutId)
+    }
+
+    // 更新快捷指令
+    store.updateShortcut(shortcutId, {
       name: data.name,
       icon: data.icon,
-      prompt: data.prompt
+      prompt: data.prompt,
+      hotkey: data.hotkey,
+      model: data.model,
+      temperature: data.temperature
     })
+
+    // 注册新快捷键
+    if (data.hotkey) {
+      await window.api.aiShortcutHotkey.register(
+        shortcutId,
+        data.hotkey,
+        data.name,
+        data.icon,
+        data.prompt,
+        data.model,
+        data.temperature
+      )
+    }
   }
 }
 
@@ -251,7 +304,10 @@ function handleConfirmDialogConfirm(): void {
 
 // 初始化
 onMounted(() => {
+  // 初始化 store（从 localStorage 加载）
+  // 注意：快捷键已经在 SuperPanel 启动时注册，这里只需要加载数据
   store.initialize()
+  console.log('[AIShortcut] Store initialized, hotkeys already loaded by SuperPanel')
 })
 </script>
 

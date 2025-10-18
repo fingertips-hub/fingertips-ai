@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-    @click.self="handleCancel"
+    @click.self="handleMaskClick"
   >
     <div class="bg-white rounded-lg shadow-xl p-6 w-[480px] animate-fade-in">
       <!-- 标题 -->
@@ -77,6 +77,7 @@ interface Props {
   visible: boolean
   mode?: 'add' | 'edit'
   category?: ShortcutCategory | null
+  closeOnMask?: boolean // 点击遮罩是否关闭
 }
 
 interface Emits {
@@ -87,7 +88,8 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'add',
-  category: null
+  category: null,
+  closeOnMask: false // 默认点击遮罩不关闭
 })
 
 const emit = defineEmits<Emits>()
@@ -153,6 +155,15 @@ function handleConfirm(): void {
 function handleCancel(): void {
   emit('cancel')
   emit('update:visible', false)
+}
+
+/**
+ * 点击遮罩
+ */
+function handleMaskClick(): void {
+  if (props.closeOnMask) {
+    handleCancel()
+  }
 }
 </script>
 

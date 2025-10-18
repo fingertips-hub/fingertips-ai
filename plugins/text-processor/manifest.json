@@ -1,0 +1,42 @@
+{
+  "id": "text-processor",
+  "name": "文本处理工具",
+  "version": "1.0.0",
+  "description": "一个功能强大的文本处理插件，支持大小写转换、去空格、URL编码等多种文本处理功能",
+  "keywords": ["工具", "文本处理", "效率"],
+  "author": "Fingertips AI Team",
+  "icon": "mdi:text-box-edit",
+  "homepage": "https://github.com/fingertips-ai/plugins",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["notification", "clipboard", "dialog", "fs:read", "fs:write"],
+
+  "ui": {
+    "hasSettings": true,
+    "hasPanel": false,
+    "settingsComponent": "ui/settings.vue"
+  },
+
+  "config": {
+    "defaults": {
+      "language": "zh-CN",
+      "autoNotify": true,
+      "copyResult": true,
+      "defaultOperation": "uppercase",
+      "history": {
+        "enabled": true,
+        "maxItems": 10
+      }
+    }
+  },
+
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": true
+  }
+}

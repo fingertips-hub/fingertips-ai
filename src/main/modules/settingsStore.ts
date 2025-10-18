@@ -10,6 +10,8 @@ export interface AppSettings {
   // AI 设置
   aiBaseUrl: string
   aiApiKey: string
+  aiModels: string[] // 可用的 AI 模型列表
+  aiDefaultModel: string // 默认使用的模型
 }
 
 /**
@@ -21,13 +23,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   hotkey: 'LongPress:Middle', // 默认：长按中键
 
   aiBaseUrl: 'https://api.openai.com/v1',
-  aiApiKey: ''
+  aiApiKey: '',
+  aiModels: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'], // 默认模型列表
+  aiDefaultModel: 'gpt-4o' // 默认模型
 }
 
 // 动态导入 electron-store（因为它是纯 ES Module）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let store: any = null
 let storeReady = false
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 async function initStore() {
   if (!store) {
     const ElectronStore = (await import('electron-store')).default
@@ -46,11 +52,20 @@ initStore().catch(console.error)
 /**
  * 确保 store 已初始化
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 async function ensureStore() {
   if (!storeReady) {
     await initStore()
   }
   return store
+}
+
+/**
+ * 获取 store 实例（异步）
+ */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function getStore() {
+  return ensureStore()
 }
 
 /**
@@ -102,11 +117,4 @@ export async function setHotkey(hotkey: string): Promise<void> {
 export async function resetSettings(): Promise<void> {
   const s = await ensureStore()
   s.clear()
-}
-
-/**
- * 获取 store 实例（异步）
- */
-export async function getStore() {
-  return ensureStore()
 }
