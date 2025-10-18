@@ -262,6 +262,8 @@ export async function createAIShortcutRunnerWindow(
     show: false,
     frame: false, // 隐藏默认标题栏
     autoHideMenuBar: true,
+    resizable: false, // 禁止调整窗口大小
+    maximizable: false, // 禁止最大化窗口（包括双击标题栏）
     backgroundColor: '#ffffff',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
