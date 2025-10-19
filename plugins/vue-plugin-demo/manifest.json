@@ -1,0 +1,33 @@
+{
+  "id": "vue-plugin-demo",
+  "name": "Vue 插件开发示例",
+  "version": "1.0.0",
+  "description": "展示如何使用 Vue 3 开发插件界面的完整示例",
+  "keywords": ["示例", "Vue", "开发", "UI"],
+  "author": "Fingertips AI Team",
+  "icon": "mdi:vuejs",
+  "homepage": "https://github.com/fingertips-ai/plugins",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["notification", "window", "dialog", "clipboard"],
+
+  "config": {
+    "defaults": {
+      "theme": "light",
+      "language": "zh-CN",
+      "notifications": true,
+      "autoSave": true,
+      "itemsPerPage": 10
+    }
+  },
+
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": true
+  }
+}

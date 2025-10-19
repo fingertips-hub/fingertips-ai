@@ -7,6 +7,7 @@ import {
 } from './pluginLoader'
 import { isPluginEnabled, setPluginEnabled, getEnabledPlugins } from './pluginStore'
 import { createPluginAPI, createPluginConfigAPI } from './pluginAPI'
+import { pluginWindowManager } from './pluginWindowManager'
 
 /**
  * 插件管理器
@@ -153,6 +154,9 @@ class PluginManager {
 
     try {
       console.log(`Deactivating plugin: ${plugin.manifest.name} (${pluginId})`)
+
+      // 关闭插件创建的所有窗口
+      pluginWindowManager.closePluginWindows(pluginId)
 
       // 调用插件的 deactivate 方法
       if (plugin.lifecycle.deactivate) {
@@ -323,6 +327,9 @@ class PluginManager {
         }
       }
     }
+
+    // 清理所有插件窗口
+    pluginWindowManager.cleanup()
 
     this.plugins.clear()
     this.initialized = false

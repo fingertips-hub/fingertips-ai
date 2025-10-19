@@ -16,11 +16,6 @@
 
   "permissions": ["notification"],
 
-  "ui": {
-    "hasSettings": false,
-    "hasPanel": false
-  },
-
   "config": {
     "defaults": {
       "message": "Hello from Fingertips AI Plugin!"

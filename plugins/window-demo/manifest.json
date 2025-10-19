@@ -1,0 +1,30 @@
+{
+  "id": "window-demo",
+  "name": "窗口示例插件",
+  "version": "1.0.0",
+  "description": "展示如何使用 Window API 创建自定义窗口的示例插件",
+  "keywords": ["示例", "窗口", "开发"],
+  "author": "Fingertips AI Team",
+  "icon": "mdi:window-open",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["window", "notification", "dialog"],
+
+  "config": {
+    "defaults": {
+      "theme": "light",
+      "autoClose": true,
+      "windowCount": 0
+    }
+  },
+
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": true
+  }
+}

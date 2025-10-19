@@ -434,58 +434,72 @@ async function executePlugin(): Promise<void> {
 
   const pluginId = item.value.path // path 字段存储的是插件ID
 
-  // 先尝试从已加载的插件列表中查找（用于显示名称）
-  let plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+  // ✅ 关键修复：每次执行前重新加载插件列表，确保获取最新状态
+  // 这样可以同步插件管理器中的启用/禁用操作
+  console.log('🔄 重新加载插件列表以获取最新状态...')
+  await pluginStore.loadPlugins()
 
-  // 如果找不到，可能是插件列表未加载，尝试重新加载
-  if (!plugin && pluginStore.plugins.length === 0) {
-    console.log('插件列表未加载，正在加载...')
-    await pluginStore.loadPlugins()
-    plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+  // 从最新的插件列表中查找目标插件
+  const plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+
+  // ✅ 第一步：先进行状态检查，避免无效执行
+  // 如果插件不存在，显示错误并返回，不隐藏 SuperPanel
+  if (!plugin) {
+    console.error('插件不存在，可能已被卸载')
+    toast.error('插件不存在，可能已被卸载')
+    return
   }
 
-  const pluginName = plugin?.name || item.value.name
+  // 如果插件未启用，显示警告并返回，不隐藏 SuperPanel
+  if (!plugin.activated) {
+    console.warn('插件未启用，请先在设置中启用该插件')
+    toast.warning('插件未启用，请先在设置中启用该插件')
+    return
+  }
+
+  // ✅ 第二步：状态检查通过，继续执行流程
+  const pluginName = plugin.name || item.value.name
 
   console.log('=== 执行插件 ===')
   console.log('插件名称:', pluginName)
   console.log('插件ID:', pluginId)
+  console.log('插件状态: 已启用 ✓')
   console.log('================')
 
-  // 🎯 关键修复：先隐藏 SuperPanel，避免与插件窗口的焦点冲突
-  // 插件可能会显示对话框或窗口，需要立即隐藏 SuperPanel
+  // ✅ 第三步：获取捕获的选中文本
+  // 必须在隐藏 SuperPanel 之前获取，避免因隐藏面板时清空缓存导致插件拿不到文本
+  let capturedText = ''
+  try {
+    capturedText = await window.api.superPanel.getCapturedText()
+    console.log('[SuperPanelItem] 捕获的文本长度:', capturedText.length)
+  } catch (err) {
+    console.error('[SuperPanelItem] 获取捕获文本失败:', err)
+    capturedText = ''
+  }
+
+  // ✅ 第四步：隐藏 SuperPanel
+  // 插件可能会显示对话框或窗口，需要立即隐藏 SuperPanel 避免焦点冲突
   setTimeout(() => {
     toast.clearAll()
     window.api.superPanel.hide()
   }, 50)
 
-  // 然后异步执行插件（不阻塞 SuperPanel 的隐藏）
+  // ✅ 第五步：异步执行插件（不阻塞 SuperPanel 的隐藏）
   // 使用 setTimeout 确保 SuperPanel 隐藏操作先执行
   setTimeout(async () => {
     try {
-      // 🎯 优化：获取捕获的选中文本，直接传递给插件
-      const capturedText = await window.api.superPanel.getCapturedText()
-      console.log('[SuperPanelItem] 捕获的文本长度:', capturedText.length)
-
       // 构建插件参数，将选中文本作为 text 参数传递
       const params = capturedText ? { text: capturedText } : undefined
 
-      // 调用主进程的执行 API，让主进程处理所有状态检查
+      // 调用主进程的执行 API
       await pluginStore.executePlugin(pluginId, params)
       console.log(`插件「${pluginName}」执行完成`)
     } catch (error) {
       console.error('执行插件失败:', error)
       const errorMessage = (error as Error).message
 
-      // 根据错误消息提供友好的提示
-      if (errorMessage.includes('not found')) {
-        console.error('插件不存在，可能已被卸载')
-      } else if (errorMessage.includes('not activated')) {
-        console.error('插件未启用，请先在设置中启用该插件')
-      } else {
-        console.error(`执行插件失败: ${errorMessage}`)
-      }
-      // 注意：此时 SuperPanel 已隐藏，所以不显示 toast 错误提示
-      // 错误信息已在插件内部通过对话框或通知显示
+      // 显示详细错误信息（理论上不应该到这里，因为前面已经检查过状态）
+      toast.error(`执行插件失败: ${errorMessage}`)
     }
   }, 100)
 }

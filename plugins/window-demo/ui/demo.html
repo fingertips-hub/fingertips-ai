@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>演示窗口</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        animation: gradientShift 10s ease infinite;
+        background-size: 200% 200%;
+      }
+
+      @keyframes gradientShift {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      .card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 40px;
+        text-align: center;
+        max-width: 350px;
+        animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      }
+
+      @keyframes popIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.3);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+        animation: bounce 2s infinite;
+      }
+
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 12px;
+        font-size: 24px;
+      }
+
+      .message {
+        color: #666;
+        font-size: 16px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+
+      .info {
+        background: #f9f9f9;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+        text-align: left;
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .info-item:last-child {
+        border-bottom: none;
+      }
+
+      .info-label {
+        color: #999;
+        font-size: 13px;
+      }
+
+      .info-value {
+        color: #333;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      button {
+        padding: 12px 32px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-family: inherit;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .footer {
+        margin-top: 20px;
+        font-size: 12px;
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">🪟</div>
+      <h1>演示窗口</h1>
+      <p class="message" id="message">这是一个演示窗口</p>
+
+      <div class="info">
+        <div class="info-item">
+          <span class="info-label">窗口编号</span>
+          <span class="info-value" id="windowNumber">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">创建时间</span>
+          <span class="info-value" id="timestamp">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">窗口 ID</span>
+          <span class="info-value" id="windowId">-</span>
+        </div>
+      </div>
+
+      <button onclick="closeWindow()">关闭窗口</button>
+
+      <div class="footer">
+        <p>Window API 演示 · Fingertips AI</p>
+      </div>
+    </div>
+
+    <script>
+      // 页面加载时初始化
+      window.addEventListener('DOMContentLoaded', () => {
+        // 从 window.pluginData 获取传入的数据
+        if (window.pluginData) {
+          document.getElementById('message').textContent =
+            window.pluginData.message || '这是一个演示窗口'
+          document.getElementById('windowNumber').textContent =
+            `# ${window.pluginData.windowNumber || 'N/A'}`
+          document.getElementById('timestamp').textContent = window.pluginData.timestamp || 'N/A'
+        }
+
+        // 显示窗口 ID
+        if (window.windowId) {
+          document.getElementById('windowId').textContent = window.windowId
+        }
+      })
+
+      // 关闭窗口
+      function closeWindow() {
+        window.close()
+      }
+    </script>
+  </body>
+</html>

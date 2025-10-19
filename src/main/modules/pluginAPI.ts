@@ -1,11 +1,19 @@
 import { dialog, clipboard, Notification, nativeImage, ipcMain } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import type { PluginAPI, PluginManifest, PluginPermission, PluginConfig } from '../types/plugin'
+import type {
+  PluginAPI,
+  PluginManifest,
+  PluginPermission,
+  PluginConfig,
+  PluginWindowOptions,
+  PluginWindowInstance
+} from '../types/plugin'
 import { getSettings, getSetting } from './settingsStore'
 import { getPluginConfig, setPluginConfig, setPluginConfigValue } from './pluginStore'
 import { getPluginDirectory } from './pluginLoader'
 import { app } from 'electron'
+import { pluginWindowManager } from './pluginWindowManager'
 
 /**
  * 插件 API 提供者
@@ -301,13 +309,76 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
     }
   }
 
+  /**
+   * Window API
+   */
+  const windowAPI = {
+    async create(options: PluginWindowOptions): Promise<PluginWindowInstance> {
+      if (!hasPermission(manifest, 'window' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} does not have permission: window`)
+      }
+
+      // 如果使用了远程 URL，需要 network 权限
+      if (options.url && !hasPermission(manifest, 'network' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} needs 'network' permission to load remote URLs`)
+      }
+
+      // 如果指定了 HTML 文件，验证路径安全性
+      if (options.html) {
+        // 确保路径不包含 .. 等危险字符
+        const normalizedPath = path.normalize(options.html)
+        if (normalizedPath.includes('..') || path.isAbsolute(normalizedPath)) {
+          throw new Error('Invalid HTML path: must be a relative path within plugin directory')
+        }
+
+        // 验证文件存在性
+        const fullPath = path.join(pluginDir, normalizedPath)
+        try {
+          await fs.access(fullPath)
+        } catch (error) {
+          throw new Error(`HTML file not found: ${options.html}`)
+        }
+      }
+
+      // 创建窗口
+      return await pluginWindowManager.createWindow(manifest, options)
+    },
+
+    get(windowId: string): PluginWindowInstance | undefined {
+      if (!hasPermission(manifest, 'window' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} does not have permission: window`)
+      }
+
+      return pluginWindowManager.getWindow(windowId)
+    },
+
+    getAll(): PluginWindowInstance[] {
+      if (!hasPermission(manifest, 'window' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} does not have permission: window`)
+      }
+
+      // 只返回该插件创建的窗口
+      return pluginWindowManager.getPluginWindows(manifest.id)
+    },
+
+    closeAll(): void {
+      if (!hasPermission(manifest, 'window' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} does not have permission: window`)
+      }
+
+      // 只关闭该插件创建的窗口
+      pluginWindowManager.closePluginWindows(manifest.id)
+    }
+  }
+
   return {
     settings: settingsAPI,
     dialog: dialogAPI,
     notification: notificationAPI,
     clipboard: clipboardAPI,
     fs: fsAPI,
-    ipc: ipcAPI
+    ipc: ipcAPI,
+    window: windowAPI
   }
 }
 

@@ -19,6 +19,7 @@
 - [权限系统](#权限系统)
 - [配置管理](#配置管理)
 - [开发带窗口的插件](#开发带窗口的插件)
+- [使用 Vue 3 开发插件界面](#使用-vue-3-开发插件界面)
 - [调试技巧](#调试技巧)
 - [最佳实践](#最佳实践)
 - [常见问题](#常见问题)
@@ -194,9 +195,7 @@ my-plugin/
   ],
 
   "ui": {
-    "hasSettings": true,
     "hasPanel": false,
-    "settingsComponent": "ui/settings.vue",
     "panelComponent": "ui/panel.vue"
   },
 
@@ -471,8 +470,9 @@ my-plugin/
 ###### `ui.hasSettings`
 
 - **类型**: `boolean`
-- **说明**: 是否有配置界面
+- **说明**: 是否有配置界面（已废弃）
 - **默认值**: `false`
+- **⚠️ 注意**: 此字段已废弃。插件配置现在应该通过插件自己创建的独立窗口或对话框来管理，而不是集成到应用设置页面中。
 
 ###### `ui.hasPanel`
 
@@ -483,8 +483,8 @@ my-plugin/
 ###### `ui.settingsComponent`
 
 - **类型**: `string`
-- **说明**: 配置界面组件路径 (Vue 单文件组件)
-- **要求**: `hasSettings` 为 `true` 时必需
+- **说明**: 配置界面组件路径（已废弃）
+- **⚠️ 注意**: 此字段已废弃。请通过 IPC 通信或创建独立窗口的方式来实现插件配置界面。
 
 ###### `ui.panelComponent`
 
@@ -496,9 +496,7 @@ my-plugin/
 
 ```json
 "ui": {
-  "hasSettings": true,
-  "hasPanel": false,
-  "settingsComponent": "ui/settings.vue"
+  "hasPanel": false
 }
 ```
 
@@ -1410,7 +1408,297 @@ context.ipc.on('request', (event, data) => {
 })
 ```
 
-### 7. Config API
+### 7. Window API
+
+创建和管理自定义窗口。
+
+**权限要求**: `window`
+
+#### create(options)
+
+创建一个新窗口。
+
+**参数**:
+
+```typescript
+interface PluginWindowOptions {
+  title?: string // 窗口标题
+  width?: number // 窗口宽度 (默认 800)
+  height?: number // 窗口高度 (默认 600)
+  minWidth?: number // 最小宽度
+  minHeight?: number // 最小高度
+  maxWidth?: number // 最大宽度
+  maxHeight?: number // 最大高度
+  resizable?: boolean // 是否可调整大小 (默认 true)
+  frame?: boolean // 是否显示窗口框架 (默认 true)
+  center?: boolean // 是否居中显示 (默认 true)
+  alwaysOnTop?: boolean // 是否置顶 (默认 false)
+  modal?: boolean // 是否模态窗口 (默认 false)
+  html?: string // HTML 文件路径 (相对于插件目录)
+  url?: string // 远程 URL (需要 network 权限)
+  data?: Record<string, any> // 传递给窗口的数据
+}
+```
+
+**返回值**: `Promise<PluginWindowInstance>`
+
+**窗口实例方法**:
+
+```typescript
+interface PluginWindowInstance {
+  id: string // 窗口 ID
+  close(): void // 关闭窗口
+  focus(): void // 聚焦窗口
+  hide(): void // 隐藏窗口
+  show(): void // 显示窗口
+  minimize(): void // 最小化
+  maximize(): void // 最大化
+  isVisible(): boolean // 是否可见
+  send(channel: string, ...args: any[]): void // 向窗口发送消息
+}
+```
+
+**示例 1: 创建本地 HTML 窗口**:
+
+```javascript
+// index.js
+async function openConfigWindow() {
+  const window = await pluginContext.api.window.create({
+    title: '插件配置',
+    width: 600,
+    height: 400,
+    html: 'ui/config.html', // 相对于插件目录
+    data: {
+      pluginId: pluginContext.manifest.id,
+      config: await pluginContext.config.getAll()
+    }
+  })
+
+  console.log('窗口已创建:', window.id)
+
+  // 可以控制窗口
+  // window.focus()
+  // window.close()
+
+  return window
+}
+```
+
+**ui/config.html**:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>插件配置</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        padding: 20px;
+        margin: 0;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      button {
+        padding: 10px 20px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>插件配置</h2>
+
+    <div class="form-group">
+      <label>API 密钥</label>
+      <input type="password" id="apiKey" placeholder="请输入 API 密钥" />
+    </div>
+
+    <div class="form-group">
+      <label>语言</label>
+      <select id="language">
+        <option value="zh-CN">简体中文</option>
+        <option value="en-US">English</option>
+      </select>
+    </div>
+
+    <button onclick="saveConfig()">保存配置</button>
+
+    <script>
+      // 页面加载时自动填充数据
+      window.addEventListener('DOMContentLoaded', () => {
+        // 从 window.pluginData 获取传入的数据
+        if (window.pluginData && window.pluginData.config) {
+          const config = window.pluginData.config
+          document.getElementById('apiKey').value = config.apiKey || ''
+          document.getElementById('language').value = config.language || 'zh-CN'
+        }
+      })
+
+      async function saveConfig() {
+        const config = {
+          apiKey: document.getElementById('apiKey').value,
+          language: document.getElementById('language').value
+        }
+
+        // 通过 IPC 保存配置
+        const pluginId = window.pluginData.pluginId
+        const result = await window.api.plugin.invoke(`${pluginId}:saveConfig`, config)
+
+        if (result.success) {
+          alert('配置已保存')
+          window.close()
+        } else {
+          alert('保存失败: ' + result.error)
+        }
+      }
+    </script>
+  </body>
+</html>
+```
+
+**示例 2: 创建数据展示窗口**:
+
+```javascript
+async function showDataWindow(data) {
+  const window = await pluginContext.api.window.create({
+    title: '数据详情',
+    width: 800,
+    height: 600,
+    html: 'ui/data-view.html',
+    data: {
+      items: data.items,
+      timestamp: Date.now()
+    }
+  })
+
+  // 5秒后自动关闭
+  setTimeout(() => {
+    if (window.isVisible()) {
+      window.close()
+    }
+  }, 5000)
+}
+```
+
+**示例 3: 创建无边框窗口**:
+
+```javascript
+const window = await pluginContext.api.window.create({
+  title: '快捷面板',
+  width: 300,
+  height: 200,
+  frame: false, // 无边框
+  alwaysOnTop: true, // 置顶
+  resizable: false, // 不可调整大小
+  html: 'ui/quick-panel.html'
+})
+```
+
+#### get(windowId)
+
+获取已创建的窗口实例。
+
+**参数**:
+
+- `windowId`: 窗口 ID
+
+**返回值**: `PluginWindowInstance | undefined`
+
+**示例**:
+
+```javascript
+const window = pluginContext.api.window.get('my-plugin-window-1')
+if (window) {
+  window.focus()
+}
+```
+
+#### getAll()
+
+获取插件创建的所有窗口。
+
+**返回值**: `PluginWindowInstance[]`
+
+**示例**:
+
+```javascript
+const windows = pluginContext.api.window.getAll()
+console.log(`插件共有 ${windows.length} 个窗口`)
+
+windows.forEach((window) => {
+  console.log(`窗口 ${window.id} 可见: ${window.isVisible()}`)
+})
+```
+
+#### closeAll()
+
+关闭插件创建的所有窗口。
+
+**返回值**: `void`
+
+**示例**:
+
+```javascript
+// 清理所有窗口
+pluginContext.api.window.closeAll()
+```
+
+**窗口通信**:
+
+插件可以通过 IPC 与窗口通信：
+
+```javascript
+// 主进程 (index.js)
+activate(context) {
+  // 注册配置保存处理器
+  context.ipc.handle('saveConfig', async (event, config) => {
+    await context.config.setAll(config)
+    return { success: true }
+  })
+
+  // 创建窗口
+  const window = await context.api.window.create({
+    html: 'ui/config.html',
+    data: { pluginId: context.manifest.id }
+  })
+
+  // 向窗口发送消息
+  window.send('update-status', { status: 'ready' })
+}
+```
+
+**注意事项**:
+
+1. **安全性**: 窗口运行在沙盒环境中，不能直接访问 Node.js API
+2. **路径限制**: HTML 文件必须在插件目录内，使用相对路径
+3. **远程 URL**: 加载远程 URL 需要额外的 `network` 权限
+4. **自动清理**: 插件停用时，所有窗口会自动关闭
+5. **数据传递**: 使用 `data` 参数传递初始数据，在窗口中通过 `window.pluginData` 访问
+6. **IPC 通信**: 使用插件的 IPC 处理器与窗口通信
+
+### 8. Config API
 
 插件配置管理。
 
@@ -1516,6 +1804,7 @@ context.config.onChange('language', (newValue, oldValue) => {
 | `notification`   | 显示系统通知    | 低       | 任务完成提醒         |
 | `clipboard`      | 访问剪贴板      | 中       | 剪贴板历史、文本处理 |
 | `dialog`         | 显示系统对话框  | 低       | 文件选择、用户确认   |
+| `window`         | 创建和管理窗口  | 中       | 自定义界面、配置面板 |
 | `ai:config`      | 访问 AI 配置    | 中       | AI 功能扩展          |
 | `settings:read`  | 读取应用设置    | 低       | 读取配置信息         |
 | `settings:write` | 写入应用设置    | 中       | 修改应用配置         |
@@ -1553,6 +1842,8 @@ try {
 ## ⚙️ 配置管理
 
 插件可以有自己的配置项,存储用户设置和运行时数据。
+
+**重要说明**: 插件配置界面应该由插件自己创建和管理（通过对话框或独立窗口），而不是集成到应用的设置页面中。这样可以让插件有更大的灵活性来设计自己的配置界面。详见 [开发带窗口的插件 - 方案 4](#方案-4-创建插件配置窗口) 部分。
 
 ### 定义默认配置
 
@@ -1706,66 +1997,96 @@ async execute(params) {
 }
 ```
 
-### 方案 2: 创建独立窗口 (未来支持)
+### 方案 2: 创建独立窗口
 
-创建完全自定义的窗口。
+创建完全自定义的窗口。插件现在可以使用 Window API 创建自己的窗口。
 
 **manifest.json**:
 
 ```json
 {
-  "ui": {
-    "hasPanel": true,
-    "panelComponent": "ui/panel.vue"
-  },
-  "permissions": ["window"]
+  "permissions": ["window", "dialog"]
 }
 ```
 
 **index.js**:
 
 ```javascript
-async execute(params) {
-  // 请求创建窗口
-  await context.api.window.create({
-    title: '我的插件窗口',
-    width: 800,
-    height: 600,
-    component: 'ui/panel.vue'
+let pluginContext = null
+let configWindow = null
+
+module.exports = {
+  activate(context) {
+    pluginContext = context
+
+    // 注册保存配置的处理器
+    context.ipc.handle('saveConfig', async (event, config) => {
+      await context.config.setAll(config)
+      return { success: true }
+    })
+  },
+
+  deactivate() {
+    // 关闭窗口
+    if (configWindow) {
+      configWindow.close()
+      configWindow = null
+    }
+    pluginContext = null
+  },
+
+  async execute(params) {
+    // 检查配置
+    const config = await pluginContext.config.getAll()
+
+    if (!config.apiKey) {
+      // 提示用户配置
+      const choice = await pluginContext.api.dialog.showMessageBox({
+        type: 'question',
+        title: '需要配置',
+        message: '请先配置 API 密钥',
+        buttons: ['立即配置', '取消']
+      })
+
+      if (choice === 0) {
+        await openConfigWindow()
+      }
+
+      return { success: false, error: '未配置' }
+    }
+
+    // 执行功能
+    return { success: true }
+  }
+}
+
+async function openConfigWindow() {
+  // 如果窗口已存在，聚焦它
+  if (configWindow && configWindow.isVisible()) {
+    configWindow.focus()
+    return
+  }
+
+  // 创建配置窗口
+  configWindow = await pluginContext.api.window.create({
+    title: '插件配置',
+    width: 600,
+    height: 400,
+    resizable: false,
+    html: 'ui/config.html',
+    data: {
+      pluginId: pluginContext.manifest.id,
+      config: await pluginContext.config.getAll()
+    }
   })
+
+  console.log('配置窗口已打开')
 }
 ```
 
-**ui/panel.vue**:
+**ui/config.html**:
 
-```vue
-<template>
-  <div class="plugin-panel">
-    <h1>{{ title }}</h1>
-    <p>{{ message }}</p>
-    <button @click="handleClick">执行操作</button>
-  </div>
-</template>
-
-<script setup>
-import { ref } from 'vue'
-
-const title = ref('插件面板')
-const message = ref('这是一个自定义面板')
-
-async function handleClick() {
-  // 调用插件 API
-  const result = await window.api.plugin.invoke('my-plugin:action')
-  message.value = result.message
-}
-</script>
-
-<style scoped>
-.plugin-panel {
-  padding: 20px;
-}
-</style>
-```
+完整的 HTML 配置界面（参考 Window API 示例）
 
 ### 方案 3: 使用通知展示信息
 
@@ -1791,101 +2112,1157 @@ async execute(params) {
 }
 ```
 
-### 方案 4: 集成到设置页面
+### 方案 4: 创建插件配置窗口
 
-如果需要配置界面。
+插件应该通过自己的独立窗口或对话框来管理配置，而不是集成到应用设置页面中。这样可以让插件有更大的灵活性和自主权。
+
+#### 方案 4.1: 使用简单对话框
+
+适合简单的配置场景。
 
 **manifest.json**:
 
 ```json
 {
-  "ui": {
-    "hasSettings": true,
-    "settingsComponent": "ui/settings.vue"
+  "permissions": ["dialog", "notification"]
+}
+```
+
+**index.js**:
+
+```javascript
+let pluginContext = null
+
+module.exports = {
+  activate(context) {
+    pluginContext = context
+
+    // 注册配置处理器
+    context.ipc.handle('openSettings', async () => {
+      return await openSettingsDialog()
+    })
+  },
+
+  deactivate() {
+    pluginContext = null
+  },
+
+  async execute(params) {
+    // 如果需要配置，先打开配置对话框
+    const config = await pluginContext.config.getAll()
+
+    if (!config.apiKey) {
+      const result = await pluginContext.api.dialog.showMessageBox({
+        type: 'question',
+        title: '需要配置',
+        message: '请先配置 API 密钥',
+        detail: '您需要在插件配置中设置 API 密钥才能使用此功能',
+        buttons: ['打开配置', '取消']
+      })
+
+      if (result === 0) {
+        await openSettingsDialog()
+      }
+
+      return { success: false, error: '未配置' }
+    }
+
+    // 执行插件功能
+    return { success: true }
+  }
+}
+
+// 打开配置对话框
+async function openSettingsDialog() {
+  const config = await pluginContext.config.getAll()
+
+  // 简单示例：使用系统对话框收集配置
+  // 实际应用中，你可能需要创建一个 HTML 窗口或使用第三方 UI 库
+  const result = await pluginContext.api.dialog.showMessageBox({
+    type: 'info',
+    title: '插件配置',
+    message: '配置功能开发中...',
+    detail: '未来版本将支持完整的配置窗口',
+    buttons: ['确定']
+  })
+
+  return { success: true }
+}
+```
+
+#### 方案 4.2: 使用 Window API 创建配置窗口（完整示例）
+
+使用 Window API 创建一个功能完整的配置窗口。
+
+**插件目录结构**:
+
+```
+my-plugin/
+├── manifest.json
+├── index.js
+└── ui/
+    └── config.html
+```
+
+**manifest.json**:
+
+```json
+{
+  "id": "my-plugin",
+  "name": "示例插件",
+  "version": "1.0.0",
+  "description": "带配置窗口的示例插件",
+  "keywords": ["示例", "窗口"],
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+  "main": "index.js",
+  "permissions": ["window", "notification"],
+  "config": {
+    "defaults": {
+      "apiKey": "",
+      "language": "zh-CN",
+      "enabled": true
+    }
   }
 }
 ```
 
-**ui/settings.vue**:
+**index.js**:
 
-```vue
-<template>
-  <div class="plugin-settings">
-    <h2>{{ manifest.name }} 配置</h2>
+```javascript
+let pluginContext = null
+let configWindow = null
 
-    <div class="form-group">
-      <label>API 密钥</label>
-      <input v-model="config.apiKey" type="password" />
-    </div>
+module.exports = {
+  activate(context) {
+    pluginContext = context
+    console.log('插件已激活')
 
-    <div class="form-group">
-      <label>语言</label>
-      <select v-model="config.language">
-        <option value="zh-CN">简体中文</option>
-        <option value="en-US">English</option>
-      </select>
-    </div>
+    // 注册保存配置的 IPC 处理器
+    context.ipc.handle('saveConfig', async (event, newConfig) => {
+      try {
+        await context.config.setAll(newConfig)
 
-    <button @click="saveConfig">保存配置</button>
-  </div>
-</template>
+        // 通知配置已保存
+        context.api.notification.show({
+          title: '配置已保存',
+          body: '插件配置已成功更新'
+        })
 
-<script setup>
-import { ref, onMounted, inject } from 'vue'
+        return { success: true }
+      } catch (error) {
+        return { success: false, error: error.message }
+      }
+    })
 
-const manifest = inject('pluginManifest')
-const config = ref({})
+    // 注册获取配置的处理器
+    context.ipc.handle('getConfig', async () => {
+      const config = await context.config.getAll()
+      return { success: true, data: config }
+    })
+  },
 
-onMounted(async () => {
-  // 加载配置
-  const result = await window.api.plugin.getConfig(manifest.id)
-  if (result.success) {
-    config.value = result.data
+  deactivate() {
+    // 清理：关闭配置窗口
+    if (configWindow) {
+      configWindow.close()
+      configWindow = null
+    }
+    pluginContext = null
+  },
+
+  async execute(params) {
+    // 获取配置
+    const config = await pluginContext.config.getAll()
+
+    // 检查必需配置
+    if (!config.apiKey) {
+      // 打开配置窗口
+      await openConfigWindow()
+      return { success: false, error: '需要配置 API 密钥' }
+    }
+
+    // 执行插件功能
+    pluginContext.api.notification.show({
+      title: '插件执行',
+      body: '功能已执行'
+    })
+
+    return { success: true }
   }
+}
+
+// 打开配置窗口
+async function openConfigWindow() {
+  try {
+    // 如果窗口已存在且可见，聚焦它
+    if (configWindow && configWindow.isVisible()) {
+      configWindow.focus()
+      return
+    }
+
+    // 创建新的配置窗口
+    configWindow = await pluginContext.api.window.create({
+      title: `${pluginContext.manifest.name} - 配置`,
+      width: 600,
+      height: 500,
+      minWidth: 500,
+      minHeight: 400,
+      center: true,
+      resizable: true,
+      html: 'ui/config.html',
+      data: {
+        pluginId: pluginContext.manifest.id,
+        pluginName: pluginContext.manifest.name,
+        config: await pluginContext.config.getAll()
+      }
+    })
+
+    console.log('配置窗口已创建:', configWindow.id)
+  } catch (error) {
+    console.error('创建配置窗口失败:', error)
+    pluginContext.api.notification.show({
+      title: '错误',
+      body: `无法打开配置窗口: ${error.message}`
+    })
+  }
+}
+```
+
+**ui/config.html**:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>插件配置</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        background: #f5f5f5;
+        padding: 20px;
+        color: #333;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .header {
+        padding: 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 14px;
+      }
+
+      .content {
+        padding: 24px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .form-group .hint {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .checkbox-group input[type='checkbox'] {
+        width: auto;
+        cursor: pointer;
+      }
+
+      .footer {
+        padding: 16px 24px;
+        background: #f9f9f9;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-1px);
+      }
+
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #666;
+      }
+
+      .btn-secondary:hover {
+        background: #d0d0d0;
+      }
+
+      .status {
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 id="pluginName">插件配置</h1>
+        <p>配置插件参数和选项</p>
+      </div>
+
+      <div class="content">
+        <div id="status" class="status"></div>
+
+        <div class="form-group">
+          <label for="apiKey">API 密钥 *</label>
+          <input type="password" id="apiKey" placeholder="请输入您的 API 密钥" required />
+          <div class="hint">用于访问外部服务的认证密钥</div>
+        </div>
+
+        <div class="form-group">
+          <label for="language">界面语言</label>
+          <select id="language">
+            <option value="zh-CN">简体中文</option>
+            <option value="en-US">English</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enabled" />
+            <label for="enabled" style="margin: 0">启用插件功能</label>
+          </div>
+          <div class="hint">取消选中将禁用插件的自动功能</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="btn-secondary" onclick="resetConfig()">重置</button>
+        <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+      </div>
+    </div>
+
+    <script>
+      let pluginId = ''
+      let originalConfig = {}
+
+      // 页面加载时初始化
+      window.addEventListener('DOMContentLoaded', async () => {
+        try {
+          // 获取传入的数据
+          if (window.pluginData) {
+            pluginId = window.pluginData.pluginId
+            document.getElementById('pluginName').textContent =
+              window.pluginData.pluginName || '插件配置'
+
+            // 加载配置
+            if (window.pluginData.config) {
+              originalConfig = window.pluginData.config
+              loadConfigToForm(originalConfig)
+            }
+          } else {
+            // 如果没有预加载数据，通过 IPC 获取
+            pluginId = window.pluginId || 'my-plugin'
+            const result = await window.api.plugin.invoke(`${pluginId}:getConfig`)
+            if (result.success) {
+              originalConfig = result.data
+              loadConfigToForm(originalConfig)
+            }
+          }
+        } catch (error) {
+          console.error('初始化配置失败:', error)
+          showStatus('error', '加载配置失败: ' + error.message)
+        }
+      })
+
+      // 将配置加载到表单
+      function loadConfigToForm(config) {
+        document.getElementById('apiKey').value = config.apiKey || ''
+        document.getElementById('language').value = config.language || 'zh-CN'
+        document.getElementById('enabled').checked = config.enabled !== false
+      }
+
+      // 从表单获取配置
+      function getConfigFromForm() {
+        return {
+          apiKey: document.getElementById('apiKey').value,
+          language: document.getElementById('language').value,
+          enabled: document.getElementById('enabled').checked
+        }
+      }
+
+      // 保存配置
+      async function saveConfig() {
+        try {
+          const newConfig = getConfigFromForm()
+
+          // 验证
+          if (!newConfig.apiKey) {
+            showStatus('error', 'API 密钥不能为空')
+            return
+          }
+
+          // 通过 IPC 保存
+          const result = await window.api.plugin.invoke(`${pluginId}:saveConfig`, newConfig)
+
+          if (result.success) {
+            showStatus('success', '配置已成功保存')
+            originalConfig = newConfig
+
+            // 2秒后关闭窗口
+            setTimeout(() => {
+              window.close()
+            }, 2000)
+          } else {
+            showStatus('error', '保存失败: ' + result.error)
+          }
+        } catch (error) {
+          console.error('保存配置失败:', error)
+          showStatus('error', '保存失败: ' + error.message)
+        }
+      }
+
+      // 重置配置
+      function resetConfig() {
+        loadConfigToForm(originalConfig)
+        showStatus('success', '已恢复到之前保存的配置')
+      }
+
+      // 显示状态消息
+      function showStatus(type, message) {
+        const statusEl = document.getElementById('status')
+        statusEl.className = `status ${type}`
+        statusEl.textContent = message
+        statusEl.style.display = 'block'
+
+        // 3秒后自动隐藏
+        setTimeout(() => {
+          statusEl.style.display = 'none'
+        }, 3000)
+      }
+    </script>
+  </body>
+</html>
+```
+
+#### 推荐做法
+
+1. **简单配置**: 使用系统对话框（`dialog.showMessageBox`）
+2. **复杂配置**: 使用 Window API 创建 HTML 配置界面
+3. **配置入口**: 在 `execute()` 中检查配置，未配置时打开配置窗口
+4. **数据传递**: 通过 `data` 参数传递初始配置，窗口中通过 `window.pluginData` 访问
+5. **IPC 通信**: 使用 `context.ipc.handle()` 注册保存配置的处理器
+6. **窗口管理**: 保存窗口实例引用，避免重复创建
+7. **自动清理**: 在 `deactivate()` 中关闭窗口
+8. **用户体验**: 保存成功后自动关闭窗口，或提供关闭按钮
+
+---
+
+## ⚡ 使用 Vue 3 开发插件界面
+
+插件窗口可以使用 Vue 3 框架来开发现代化的用户界面，无需复杂的构建步骤。
+
+### 为什么使用 Vue 3？
+
+- ✅ **响应式数据** - 自动更新界面
+- ✅ **组件化** - 代码组织清晰
+- ✅ **开发简单** - 通过 CDN 引入即可，无需构建
+- ✅ **功能强大** - 完整的 Vue 3 特性支持
+- ✅ **生态丰富** - 可集成各种 UI 库和组件
+
+### 快速开始
+
+#### 1. 基础模板
+
+在插件窗口的 HTML 中引入 Vue 3：
+
+```html
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>插件配置</title>
+  </head>
+  <body>
+    <div id="app">
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+      <button @click="counter++">点击: {{ counter }}</button>
+    </div>
+
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script>
+      const { createApp, ref } = Vue
+
+      createApp({
+        setup() {
+          const title = ref('插件配置')
+          const message = ref('欢迎使用 Vue 3')
+          const counter = ref(0)
+
+          return {
+            title,
+            message,
+            counter
+          }
+        }
+      }).mount('#app')
+    </script>
+  </body>
+</html>
+```
+
+#### 2. 完整示例
+
+**manifest.json**:
+
+```json
+{
+  "id": "vue-demo",
+  "name": "Vue 演示插件",
+  "version": "1.0.0",
+  "permissions": ["window", "notification"],
+  "main": "index.js"
+}
+```
+
+**index.js**:
+
+```javascript
+let pluginContext = null
+let configWindow = null
+
+module.exports = {
+  activate(context) {
+    pluginContext = context
+
+    // 注册 IPC 处理器
+    context.ipc.handle('saveConfig', async (event, config) => {
+      await context.config.setAll(config)
+      context.api.notification.show({
+        title: '配置已保存',
+        body: '设置已成功更新'
+      })
+      return { success: true }
+    })
+
+    context.ipc.handle('getConfig', async () => {
+      const config = await context.config.getAll()
+      return { success: true, data: config }
+    })
+  },
+
+  deactivate() {
+    if (configWindow) {
+      configWindow.close()
+      configWindow = null
+    }
+    pluginContext = null
+  },
+
+  async execute(params) {
+    await openConfigWindow()
+    return { success: true }
+  }
+}
+
+async function openConfigWindow() {
+  if (configWindow && configWindow.isVisible()) {
+    configWindow.focus()
+    return
+  }
+
+  configWindow = await pluginContext.api.window.create({
+    title: 'Vue 配置',
+    width: 800,
+    height: 600,
+    html: 'ui/config.html',
+    data: {
+      pluginId: pluginContext.manifest.id,
+      config: await pluginContext.config.getAll()
+    }
+  })
+}
+```
+
+**ui/config.html**:
+
+```html
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>配置</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+
+      #app {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 700px;
+        margin: 0 auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #666;
+        margin-right: 10px;
+      }
+
+      .alert {
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+
+      .alert.success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .alert.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .footer {
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <h1>{{ pluginName }}</h1>
+
+      <!-- 状态提示 -->
+      <div v-if="statusMessage" :class="['alert', statusType]">{{ statusMessage }}</div>
+
+      <!-- 配置表单 -->
+      <div class="form-group">
+        <label>主题</label>
+        <select v-model="config.theme">
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+          <option value="auto">自动</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>语言</label>
+        <select v-model="config.language">
+          <option value="zh-CN">简体中文</option>
+          <option value="en-US">English</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" v-model="config.notifications" />
+          启用通知
+        </label>
+      </div>
+
+      <!-- 底部操作 -->
+      <div class="footer">
+        <div>
+          <span v-if="configChanged" style="color: #ff9800">配置已修改</span>
+          <span v-else style="color: #4caf50">配置已保存</span>
+        </div>
+        <div>
+          <button class="btn-secondary" @click="resetConfig">重置</button>
+          <button class="btn-primary" @click="saveConfig" :disabled="!configChanged">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue
+
+      createApp({
+        setup() {
+          // 状态
+          const pluginId = ref('')
+          const pluginName = ref('插件配置')
+          const config = reactive({
+            theme: 'light',
+            language: 'zh-CN',
+            notifications: true
+          })
+          const originalConfig = ref(null)
+          const statusMessage = ref('')
+          const statusType = ref('success')
+
+          // 计算属性
+          const configChanged = computed(() => {
+            if (!originalConfig.value) return false
+            return JSON.stringify(config) !== JSON.stringify(originalConfig.value)
+          })
+
+          // 生命周期
+          onMounted(async () => {
+            // 加载初始数据
+            if (window.pluginData) {
+              pluginId.value = window.pluginData.pluginId
+              pluginName.value = window.pluginData.pluginName || '插件配置'
+
+              if (window.pluginData.config) {
+                Object.assign(config, window.pluginData.config)
+                originalConfig.value = JSON.parse(JSON.stringify(config))
+              }
+            }
+          })
+
+          // 方法
+          async function saveConfig() {
+            try {
+              const result = await window.api.plugin.invoke(
+                `${pluginId.value}:saveConfig`,
+                JSON.parse(JSON.stringify(config))
+              )
+
+              if (result.success) {
+                originalConfig.value = JSON.parse(JSON.stringify(config))
+                showStatus('success', '配置已保存！')
+              } else {
+                showStatus('error', '保存失败: ' + result.error)
+              }
+            } catch (error) {
+              showStatus('error', '保存失败: ' + error.message)
+            }
+          }
+
+          function resetConfig() {
+            if (originalConfig.value) {
+              Object.assign(config, originalConfig.value)
+              showStatus('success', '已恢复配置')
+            }
+          }
+
+          function showStatus(type, message) {
+            statusType.value = type
+            statusMessage.value = message
+            setTimeout(() => {
+              statusMessage.value = ''
+            }, 3000)
+          }
+
+          return {
+            pluginName,
+            config,
+            configChanged,
+            statusMessage,
+            statusType,
+            saveConfig,
+            resetConfig
+          }
+        }
+      }).mount('#app')
+    </script>
+  </body>
+</html>
+```
+
+### Vue 3 核心概念
+
+#### 响应式数据
+
+```javascript
+// ref - 用于基本类型
+const count = ref(0)
+count.value++ // 需要 .value
+
+// reactive - 用于对象
+const state = reactive({
+  name: 'Vue',
+  age: 3
+})
+state.name = 'Vue 3' // 直接访问
+```
+
+#### 计算属性
+
+```javascript
+const doubled = computed(() => count.value * 2)
+// doubled 会自动随 count 更新
+```
+
+#### 监听器
+
+```javascript
+// 监听单个数据
+watch(count, (newValue, oldValue) => {
+  console.log(`从 ${oldValue} 变为 ${newValue}`)
 })
 
-async function saveConfig() {
-  // 保存配置
-  const result = await window.api.plugin.setConfig(manifest.id, config.value)
-  if (result.success) {
-    alert('配置已保存')
+// 监听对象（深度监听）
+watch(
+  config,
+  (newConfig) => {
+    console.log('配置已更新:', newConfig)
+  },
+  { deep: true }
+)
+```
+
+#### 模板语法
+
+```html
+<!-- 文本插值 -->
+<div>{{ message }}</div>
+
+<!-- 属性绑定 -->
+<button :disabled="loading">按钮</button>
+
+<!-- 事件监听 -->
+<button @click="handleClick">点击</button>
+
+<!-- 条件渲染 -->
+<div v-if="show">显示</div>
+<div v-else>隐藏</div>
+
+<!-- 列表渲染 -->
+<div v-for="item in items" :key="item.id">{{ item.name }}</div>
+
+<!-- 双向绑定 -->
+<input v-model="message" />
+```
+
+### 高级特性
+
+#### 1. 组件定义
+
+```javascript
+createApp({
+  components: {
+    'my-button': {
+      props: ['label'],
+      template: '<button @click="$emit(\'click\')">{{ label }}</button>'
+    }
+  },
+  setup() {
+    // ...
+  }
+}).mount('#app')
+```
+
+使用：
+
+```html
+<my-button label="保存" @click="saveConfig"></my-button>
+```
+
+#### 2. 生命周期钩子
+
+```javascript
+import { onMounted, onUnmounted } from 'vue'
+
+setup() {
+  onMounted(() => {
+    console.log('组件已挂载')
+    // 初始化逻辑
+  })
+
+  onUnmounted(() => {
+    console.log('组件即将卸载')
+    // 清理逻辑
+  })
+}
+```
+
+#### 3. 与主进程通信
+
+```javascript
+// 发送请求
+async function doAction() {
+  try {
+    const result = await window.api.plugin.invoke('pluginId:action', data)
+    if (result.success) {
+      // 处理成功
+    }
+  } catch (error) {
+    // 处理错误
   }
 }
-</script>
-
-<style scoped>
-.plugin-settings {
-  padding: 20px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-input,
-select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-button {
-  padding: 10px 20px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-</style>
 ```
+
+#### 4. 集成 UI 库
+
+可以引入其他 UI 组件库：
+
+```html
+<!-- Element Plus -->
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+<script src="https://unpkg.com/element-plus"></script>
+
+<!-- Ant Design Vue -->
+<link rel="stylesheet" href="https://unpkg.com/ant-design-vue@3/dist/antd.min.css" />
+<script src="https://unpkg.com/ant-design-vue@3/dist/antd.min.js"></script>
+```
+
+### 最佳实践
+
+#### 1. 代码组织
+
+```javascript
+createApp({
+  setup() {
+    // 1. 状态定义
+    const state = reactive({ ... })
+
+    // 2. 计算属性
+    const computed1 = computed(() => { ... })
+
+    // 3. 监听器
+    watch(state, () => { ... })
+
+    // 4. 生命周期
+    onMounted(() => { ... })
+
+    // 5. 方法定义
+    function method1() { ... }
+
+    // 6. 返回暴露
+    return { state, computed1, method1 }
+  }
+}).mount('#app')
+```
+
+#### 2. 错误处理
+
+```javascript
+async function saveConfig() {
+  loading.value = true
+  try {
+    const result = await window.api.plugin.invoke('saveConfig', config)
+    if (result.success) {
+      showSuccess('保存成功')
+    } else {
+      showError('保存失败: ' + result.error)
+    }
+  } catch (error) {
+    console.error('保存配置失败:', error)
+    showError('保存失败: ' + error.message)
+  } finally {
+    loading.value = false
+  }
+}
+```
+
+#### 3. 数据验证
+
+```javascript
+const formValid = computed(() => {
+  return (
+    config.apiKey.trim() !== '' &&
+    config.language !== '' &&
+    config.itemsPerPage >= 5 &&
+    config.itemsPerPage <= 100
+  )
+})
+```
+
+```html
+<button :disabled="!formValid" @click="saveConfig">保存</button>
+```
+
+#### 4. 本地化 Vue 文件
+
+如果需要离线使用，下载 Vue.js 到插件目录：
+
+```
+vue-plugin/
+├── lib/
+│   └── vue.global.js
+└── ui/
+    └── config.html
+```
+
+```html
+<script src="../lib/vue.global.js"></script>
+```
+
+### 示例插件
+
+查看完整的示例插件：`plugins/vue-plugin-demo/`
+
+该示例展示了：
+
+- ✅ 完整的配置界面
+- ✅ 数据仪表盘
+- ✅ 标签页切换
+- ✅ 表单验证
+- ✅ IPC 通信
+- ✅ 响应式数据
+- ✅ 计算属性和监听器
+- ✅ 动画效果
+
+### 学习资源
+
+- [Vue 3 官方文档](https://cn.vuejs.org/)
+- [Vue 3 组合式 API](https://cn.vuejs.org/guide/extras/composition-api-faq.html)
+- [Vue 3 响应式基础](https://cn.vuejs.org/guide/essentials/reactivity-fundamentals.html)
+
+### 常见问题
+
+**Q: 为什么使用 CDN 而不是构建工具？**
+
+A: CDN 方式简单快速，适合大多数插件场景。如果需要更复杂的功能，可以自行设置构建流程。
+
+**Q: 可以使用 TypeScript 吗？**
+
+A: 在不引入构建工具的情况下不推荐，但可以使用 JSDoc 注释获得类型提示。
+
+**Q: 可以使用单文件组件 (.vue) 吗？**
+
+A: 需要构建步骤。可以设置 Vite/Webpack 构建，输出到插件目录。
+
+**Q: 性能如何？**
+
+A: Vue 3 性能优秀，CDN 版本已优化，浏览器会缓存，适合大多数场景。
 
 ---
 
@@ -2179,7 +3556,127 @@ function isVersionCompatible(current, required) {
 }
 ```
 
-### 8. 处理用户选中的文本
+### 8. 插件配置管理
+
+```javascript
+// ✅ 推荐: 优雅的配置管理方式
+let pluginContext = null
+
+module.exports = {
+  activate(context) {
+    pluginContext = context
+
+    // 注册打开配置的处理器
+    context.ipc.handle('openSettings', async () => {
+      return await openConfigDialog()
+    })
+
+    console.log('插件已激活')
+  },
+
+  deactivate() {
+    pluginContext = null
+  },
+
+  async execute(params) {
+    // 1. 检查必需的配置
+    const config = await pluginContext.config.getAll()
+
+    if (!config.apiKey) {
+      // 2. 提示用户进行配置
+      const choice = await pluginContext.api.dialog.showMessageBox({
+        type: 'warning',
+        title: '需要配置',
+        message: '此插件需要配置 API 密钥才能使用',
+        detail: '请点击"立即配置"按钮设置您的 API 密钥',
+        buttons: ['立即配置', '取消']
+      })
+
+      if (choice === 0) {
+        // 3. 打开配置对话框
+        await openConfigDialog()
+
+        // 4. 再次检查配置
+        const newConfig = await pluginContext.config.getAll()
+        if (!newConfig.apiKey) {
+          return { success: false, error: '未完成配置' }
+        }
+
+        // 配置完成，继续执行
+        return await executeWithConfig(newConfig, params)
+      }
+
+      return { success: false, error: '用户取消' }
+    }
+
+    // 配置已存在，直接执行
+    return await executeWithConfig(config, params)
+  }
+}
+
+// 打开配置对话框
+async function openConfigDialog() {
+  const currentConfig = await pluginContext.config.getAll()
+
+  // 方式 1: 简单的系统对话框（临时方案）
+  const result = await pluginContext.api.dialog.showMessageBox({
+    type: 'info',
+    title: '插件配置',
+    message: '请在此输入配置信息',
+    detail: `当前 API 密钥: ${currentConfig.apiKey || '未设置'}\n\n未来版本将支持图形化配置界面。`,
+    buttons: ['确定']
+  })
+
+  // 方式 2: 如果支持独立窗口（未来）
+  // await pluginContext.api.window.create({
+  //   title: '插件配置',
+  //   width: 600,
+  //   height: 400,
+  //   html: path.join(pluginContext.pluginDir, 'ui/settings.html')
+  // })
+
+  return { success: true }
+}
+
+// 使用配置执行功能
+async function executeWithConfig(config, params) {
+  try {
+    // 使用配置中的参数
+    const result = await callAPI(config.apiKey, params)
+
+    pluginContext.api.notification.show({
+      title: '执行成功',
+      body: '操作已完成'
+    })
+
+    return { success: true, data: result }
+  } catch (error) {
+    pluginContext.api.notification.show({
+      title: '执行失败',
+      body: error.message
+    })
+
+    return { success: false, error: error.message }
+  }
+}
+
+// API 调用示例
+async function callAPI(apiKey, params) {
+  // 实现实际的 API 调用逻辑
+  return { message: 'Success' }
+}
+```
+
+**配置管理要点**:
+
+1. **优雅降级**: 未配置时给出友好提示，引导用户配置
+2. **配置验证**: 在使用前验证配置的完整性和有效性
+3. **配置入口**: 提供明确的配置入口（通过对话框或通知）
+4. **配置持久化**: 使用 `context.config` API 保存配置
+5. **配置更新**: 支持用户随时更新配置
+6. **默认值**: 在 manifest.json 中提供合理的默认配置
+
+### 9. 处理用户选中的文本
 
 ```javascript
 // ✅ 推荐: 完整的文本处理插件示例

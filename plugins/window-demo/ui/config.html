@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>插件配置</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        width: 100%;
+        max-width: 600px;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .header {
+        padding: 32px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 14px;
+      }
+
+      .content {
+        padding: 32px;
+      }
+
+      .status {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        display: none;
+        font-size: 14px;
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .form-group {
+        margin-bottom: 24px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+      }
+
+      .form-group select,
+      .form-group input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s;
+        font-family: inherit;
+      }
+
+      .form-group select:focus,
+      .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .form-group .hint {
+        font-size: 12px;
+        color: #999;
+        margin-top: 6px;
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .checkbox-group:hover {
+        background: #f0f0f0;
+      }
+
+      .checkbox-group input[type='checkbox'] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+      }
+
+      .checkbox-group label {
+        margin: 0;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .info-box {
+        background: #e8f4fd;
+        border: 1px solid #b3d7f5;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+      }
+
+      .info-box h3 {
+        color: #0066cc;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .info-box p {
+        color: #555;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .footer {
+        padding: 20px 32px;
+        background: #f9f9f9;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-family: inherit;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #666;
+      }
+
+      .btn-secondary:hover {
+        background: #d0d0d0;
+      }
+
+      .btn-danger {
+        background: #dc3545;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #c82333;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 id="pluginName">插件配置</h1>
+        <p>配置插件参数和选项</p>
+      </div>
+
+      <div class="content">
+        <div id="status" class="status"></div>
+
+        <div class="info-box">
+          <h3>💡 关于此插件</h3>
+          <p>
+            这是一个展示如何使用 Window API
+            的示例插件。您可以通过此插件学习如何创建自定义窗口、管理配置和与用户交互。
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label for="theme">主题颜色</label>
+          <select id="theme">
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+            <option value="auto">自动</option>
+          </select>
+          <div class="hint">选择窗口的主题颜色</div>
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-group" onclick="toggleCheckbox('autoClose')">
+            <input type="checkbox" id="autoClose" />
+            <label for="autoClose">保存后自动关闭窗口</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>窗口创建统计</label>
+          <input
+            type="text"
+            id="windowCount"
+            readonly
+            style="background: #f9f9f9; cursor: not-allowed"
+          />
+          <div class="hint">记录通过此插件创建的窗口总数</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="btn-secondary" onclick="resetConfig()">重置</button>
+        <button class="btn-danger" onclick="closeWindow()">关闭</button>
+        <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+      </div>
+    </div>
+
+    <script>
+      let pluginId = ''
+      let originalConfig = {}
+
+      // 页面加载时初始化
+      window.addEventListener('DOMContentLoaded', async () => {
+        try {
+          // 获取传入的数据
+          if (window.pluginData) {
+            pluginId = window.pluginData.pluginId
+            document.getElementById('pluginName').textContent =
+              window.pluginData.pluginName || '插件配置'
+
+            // 加载配置
+            if (window.pluginData.config) {
+              originalConfig = window.pluginData.config
+              loadConfigToForm(originalConfig)
+            }
+          } else {
+            // 如果没有预加载数据，通过 IPC 获取
+            pluginId = window.pluginId || 'window-demo'
+            const result = await window.api.plugin.invoke(`${pluginId}:getConfig`)
+            if (result.success) {
+              originalConfig = result.data
+              loadConfigToForm(originalConfig)
+            }
+          }
+        } catch (error) {
+          console.error('初始化配置失败:', error)
+          showStatus('error', '加载配置失败: ' + error.message)
+        }
+      })
+
+      // 将配置加载到表单
+      function loadConfigToForm(config) {
+        document.getElementById('theme').value = config.theme || 'light'
+        document.getElementById('autoClose').checked = config.autoClose !== false
+        document.getElementById('windowCount').value = `已创建 ${config.windowCount || 0} 个窗口`
+      }
+
+      // 从表单获取配置
+      function getConfigFromForm() {
+        return {
+          theme: document.getElementById('theme').value,
+          autoClose: document.getElementById('autoClose').checked,
+          windowCount: originalConfig.windowCount || 0
+        }
+      }
+
+      // 保存配置
+      async function saveConfig() {
+        try {
+          const newConfig = getConfigFromForm()
+
+          // 通过 IPC 保存
+          const result = await window.api.plugin.invoke(`${pluginId}:saveConfig`, newConfig)
+
+          if (result.success) {
+            showStatus('success', '配置已成功保存！')
+            originalConfig = newConfig
+
+            // 如果启用了自动关闭，2秒后关闭窗口
+            if (newConfig.autoClose) {
+              setTimeout(() => {
+                window.close()
+              }, 2000)
+            }
+          } else {
+            showStatus('error', '保存失败: ' + result.error)
+          }
+        } catch (error) {
+          console.error('保存配置失败:', error)
+          showStatus('error', '保存失败: ' + error.message)
+        }
+      }
+
+      // 重置配置
+      function resetConfig() {
+        loadConfigToForm(originalConfig)
+        showStatus('success', '已恢复到之前保存的配置')
+      }
+
+      // 关闭窗口
+      function closeWindow() {
+        window.close()
+      }
+
+      // 切换复选框
+      function toggleCheckbox(id) {
+        const checkbox = document.getElementById(id)
+        checkbox.checked = !checkbox.checked
+      }
+
+      // 显示状态消息
+      function showStatus(type, message) {
+        const statusEl = document.getElementById('status')
+        statusEl.className = `status ${type}`
+        statusEl.textContent = message
+        statusEl.style.display = 'block'
+
+        // 3秒后自动隐藏（除非是成功消息且将要关闭窗口）
+        setTimeout(() => {
+          if (!(type === 'success' && originalConfig.autoClose)) {
+            statusEl.style.display = 'none'
+          }
+        }, 3000)
+      }
+    </script>
+  </body>
+</html>

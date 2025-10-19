@@ -12,6 +12,7 @@ export enum PluginPermission {
   DIALOG = 'dialog', // 打开系统对话框
   NOTIFICATION = 'notification', // 显示系统通知
   CLIPBOARD = 'clipboard', // 访问剪贴板
+  WINDOW = 'window', // 创建和管理窗口
   NETWORK = 'network', // 网络请求（未来）
   SHELL = 'shell' // 执行 Shell 命令（未来，高风险）
 }
@@ -128,6 +129,52 @@ export interface PluginAPIIPC {
 }
 
 /**
+ * 插件窗口配置
+ */
+export interface PluginWindowOptions {
+  title?: string // 窗口标题
+  width?: number // 窗口宽度
+  height?: number // 窗口高度
+  minWidth?: number // 最小宽度
+  minHeight?: number // 最小高度
+  maxWidth?: number // 最大宽度
+  maxHeight?: number // 最大高度
+  resizable?: boolean // 是否可调整大小
+  frame?: boolean // 是否显示窗口框架
+  center?: boolean // 是否居中显示
+  alwaysOnTop?: boolean // 是否置顶
+  modal?: boolean // 是否模态窗口
+  html?: string // HTML 文件路径（相对于插件目录）
+  url?: string // 远程 URL（需要 network 权限）
+  data?: Record<string, any> // 传递给窗口的数据
+}
+
+/**
+ * 插件窗口实例
+ */
+export interface PluginWindowInstance {
+  id: string // 窗口 ID
+  close(): void // 关闭窗口
+  focus(): void // 聚焦窗口
+  hide(): void // 隐藏窗口
+  show(): void // 显示窗口
+  minimize(): void // 最小化
+  maximize(): void // 最大化
+  isVisible(): boolean // 是否可见
+  send(channel: string, ...args: any[]): void // 向窗口发送消息
+}
+
+/**
+ * 插件 API - Window
+ */
+export interface PluginAPIWindow {
+  create(options: PluginWindowOptions): Promise<PluginWindowInstance>
+  get(windowId: string): PluginWindowInstance | undefined
+  getAll(): PluginWindowInstance[]
+  closeAll(): void
+}
+
+/**
  * 插件 API 接口
  */
 export interface PluginAPI {
@@ -137,6 +184,7 @@ export interface PluginAPI {
   clipboard: PluginAPIClipboard
   fs: PluginAPIFileSystem
   ipc: PluginAPIIPC
+  window: PluginAPIWindow
 }
 
 /**

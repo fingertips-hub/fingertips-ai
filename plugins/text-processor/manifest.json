@@ -16,12 +16,6 @@
 
   "permissions": ["notification", "clipboard", "dialog", "fs:read", "fs:write"],
 
-  "ui": {
-    "hasSettings": true,
-    "hasPanel": false,
-    "settingsComponent": "ui/settings.vue"
-  },
-
   "config": {
     "defaults": {
       "language": "zh-CN",

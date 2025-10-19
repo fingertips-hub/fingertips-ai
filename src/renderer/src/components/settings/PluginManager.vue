@@ -127,17 +127,6 @@
             <span class="switch-label">{{ plugin.enabled ? '已启用' : '已禁用' }}</span>
           </div>
 
-          <!-- 配置按钮 -->
-          <button
-            v-if="plugin.ui?.hasSettings"
-            class="btn-config"
-            @click="handleConfig(plugin)"
-            :disabled="!plugin.enabled"
-            title="配置插件"
-          >
-            <Icon icon="mdi:cog" />
-          </button>
-
           <!-- 重新加载按钮 -->
           <button class="btn-reload-single" @click="handleReload(plugin.id)" title="重新加载插件">
             <Icon icon="mdi:refresh" />
@@ -256,15 +245,6 @@ async function handleToggle(pluginId: string, enabled: boolean): Promise<void> {
 }
 
 /**
- * 配置插件
- */
-function handleConfig(plugin: any): void {
-  // TODO: 打开配置对话框
-  console.log('Configure plugin:', plugin.id)
-  alert('配置功能开发中...')
-}
-
-/**
  * 重新加载单个插件
  */
 async function handleReload(pluginId: string): Promise<void> {
@@ -288,9 +268,13 @@ async function handleReloadAll(): Promise<void> {
 
 <style scoped>
 .plugin-manager {
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 24px;
+  overflow: hidden;
 }
 
 /* 头部 */
@@ -299,6 +283,7 @@ async function handleReloadAll(): Promise<void> {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  flex-shrink: 0;
 }
 
 .title {
@@ -357,6 +342,7 @@ async function handleReloadAll(): Promise<void> {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .search-box {
@@ -451,6 +437,7 @@ async function handleReloadAll(): Promise<void> {
   padding: 8px 12px;
   background: #f9fafb;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .stats-text {
@@ -471,6 +458,8 @@ async function handleReloadAll(): Promise<void> {
   gap: 12px;
   padding: 48px;
   color: #6b7280;
+  flex: 1;
+  min-height: 0;
 }
 
 .loading-icon {
@@ -488,6 +477,7 @@ async function handleReloadAll(): Promise<void> {
   border: 1px solid #fecaca;
   border-radius: 8px;
   color: #991b1b;
+  flex-shrink: 0;
 }
 
 .error-icon {
@@ -515,6 +505,29 @@ async function handleReloadAll(): Promise<void> {
 .plugin-list {
   display: grid;
   gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+/* 滚动条样式 */
+.plugin-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.plugin-list::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.plugin-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.plugin-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .plugin-card {
@@ -697,7 +710,6 @@ input:checked + .slider:before {
 }
 
 /* 按钮 */
-.btn-config,
 .btn-reload-single,
 .btn-homepage {
   width: 36px;
@@ -715,22 +727,22 @@ input:checked + .slider:before {
   text-decoration: none;
 }
 
-.btn-config:hover:not(:disabled),
 .btn-reload-single:hover,
 .btn-homepage:hover {
   background: #e5e7eb;
   color: #111827;
 }
 
-.btn-config:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* 空状态 */
 .empty-state {
   text-align: center;
   padding: 64px 24px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .empty-icon {
