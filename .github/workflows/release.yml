@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build:win -- --publish always
+
+      - name: Get tag message
+        id: tag
+        shell: bash
+        run: |
+          git fetch --tags --force
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' ${GITHUB_REF#refs/tags/})
+          if [ -z "$TAG_MESSAGE" ]; then
+            TAG_MESSAGE="Release ${GITHUB_REF#refs/tags/}"
+          fi
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update release description
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const message = `${{ steps.tag.outputs.message }}`;
+
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tag
+              });
+              
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+                body: message
+              });
+              
+              console.log('Release description updated successfully');
+            } catch (error) {
+              console.error('Error updating release description:', error);
+            }
