@@ -1,4 +1,4 @@
-import { dialog, clipboard, Notification, nativeImage, ipcMain } from 'electron'
+import { dialog, clipboard, Notification, ipcMain } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import type {
@@ -25,29 +25,6 @@ import { pluginWindowManager } from './pluginWindowManager'
  */
 function hasPermission(manifest: PluginManifest, permission: PluginPermission): boolean {
   return manifest.permissions.includes(permission)
-}
-
-/**
- * 权限检查装饰器
- */
-function requirePermission(permission: PluginPermission) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalMethod = descriptor.value
-
-    descriptor.value = async function (this: any, ...args: any[]) {
-      const manifest = this.manifest as PluginManifest
-
-      if (!hasPermission(manifest, permission)) {
-        throw new Error(
-          `Plugin ${manifest.id} does not have permission: ${permission}. Please declare it in manifest.json`
-        )
-      }
-
-      return originalMethod.apply(this, args)
-    }
-
-    return descriptor
-  }
 }
 
 /**
@@ -295,11 +272,12 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
       ipcMain.handle(prefixedChannel, handler)
     },
 
-    send(channel: string, ...args: any[]) {
+    send(channel: string, ..._args: any[]) {
       // 确保 channel 以插件 ID 为前缀
-      const prefixedChannel = `plugin:${manifest.id}:${channel}`
+      // const _prefixedChannel = `plugin:${manifest.id}:${channel}`
       // 注意：这里需要知道目标窗口，实际实现可能需要传入 window 参数
       // 暂时先这样定义，后续可以改进
+      console.log(`Plugin ${manifest.id} sending to channel: ${channel}`)
     },
 
     on(channel: string, listener: (event: any, ...args: any[]) => void) {

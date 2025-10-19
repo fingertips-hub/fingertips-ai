@@ -35,6 +35,8 @@ interface ShortcutData {
   prompt: string
   selectedText?: string // 用户选中的文本（可选）
   autoExecute?: boolean // 是否自动执行（用于快捷键触发）
+  model?: string // AI模型（可选）
+  temperature?: number // 温度参数（可选）
 }
 
 /**
