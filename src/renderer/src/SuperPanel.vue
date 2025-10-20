@@ -167,39 +167,42 @@ const handleKeyDown = (event: KeyboardEvent): void => {
 }
 
 // 组件挂载时监听 IPC 事件和键盘事件
-onMounted(async () => {
+onMounted(() => {
   window.electron.ipcRenderer.on('super-panel:reset-pinned', handleResetPinned)
   window.addEventListener('keydown', handleKeyDown)
 
-  // 🔑 在应用启动时加载 AI 快捷指令的快捷键
-  try {
-    console.log('[SuperPanel] Initializing AI shortcut hotkeys...')
-    const aiShortcutStore = useAIShortcutStore()
+  // 🚀 性能优化：延迟加载 AI 快捷指令，避免阻塞初始渲染
+  // 使用 setTimeout 将加载操作推迟到下一个事件循环
+  setTimeout(async () => {
+    try {
+      console.log('[SuperPanel] Initializing AI shortcut hotkeys...')
+      const aiShortcutStore = useAIShortcutStore()
 
-    // 从 localStorage 加载快捷指令数据
-    aiShortcutStore.initialize()
+      // 从 localStorage 加载快捷指令数据
+      aiShortcutStore.initialize()
 
-    // 提取所有有快捷键的指令
-    const shortcuts = aiShortcutStore.shortcuts.map((s) => ({
-      id: s.id,
-      name: s.name,
-      icon: s.icon,
-      prompt: s.prompt,
-      hotkey: s.hotkey,
-      model: s.model,
-      temperature: s.temperature
-    }))
+      // 提取所有有快捷键的指令
+      const shortcuts = aiShortcutStore.shortcuts.map((s) => ({
+        id: s.id,
+        name: s.name,
+        icon: s.icon,
+        prompt: s.prompt,
+        hotkey: s.hotkey,
+        model: s.model,
+        temperature: s.temperature
+      }))
 
-    // 如果有快捷键，注册到主进程
-    if (shortcuts.length > 0 && window.api?.aiShortcutHotkey?.loadAll) {
-      const count = await window.api.aiShortcutHotkey.loadAll(shortcuts)
-      console.log(`[SuperPanel] Successfully loaded ${count} AI shortcut hotkeys`)
-    } else {
-      console.log('[SuperPanel] No AI shortcuts with hotkeys found')
+      // 如果有快捷键，注册到主进程
+      if (shortcuts.length > 0 && window.api?.aiShortcutHotkey?.loadAll) {
+        const count = await window.api.aiShortcutHotkey.loadAll(shortcuts)
+        console.log(`[SuperPanel] Successfully loaded ${count} AI shortcut hotkeys`)
+      } else {
+        console.log('[SuperPanel] No AI shortcuts with hotkeys found')
+      }
+    } catch (error) {
+      console.error('[SuperPanel] Failed to load AI shortcut hotkeys:', error)
     }
-  } catch (error) {
-    console.error('[SuperPanel] Failed to load AI shortcut hotkeys:', error)
-  }
+  }, 0) // 延迟到下一个事件循环，让初始渲染先完成
 })
 
 // 组件卸载时移除监听

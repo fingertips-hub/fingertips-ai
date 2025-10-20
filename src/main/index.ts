@@ -5,7 +5,11 @@ import icon from '../../resources/icon.png?asset'
 
 // Import modules
 import { createTray } from './modules/tray'
-import { createSuperPanelWindow, showSuperPanelAtMouse } from './modules/superPanel'
+import {
+  createSuperPanelWindow,
+  showSuperPanelAtMouse,
+  preRenderSuperPanelWindow
+} from './modules/superPanel'
 import { showSettingsWindow } from './modules/Settings'
 import { setupGlobalMouseListener, stopGlobalMouseListener } from './modules/mouseListener'
 import { setupSuperPanelHandlers, cleanupSuperPanelHandlers } from './modules/superPanelHandlers'
@@ -168,6 +172,10 @@ app.whenReady().then(() => {
 
   // Create Super Panel window (hidden by default)
   createSuperPanelWindow()
+
+  // 🚀 性能优化：延迟预渲染 Super Panel 窗口，减少首次显示延迟
+  // 延迟执行，不影响应用启动速度
+  preRenderSuperPanelWindow()
 
   // Setup global mouse listener
   setupGlobalMouseListener()

@@ -23,6 +23,7 @@ Invalid configuration object. electron-builder has been initialized using a conf
 ### 错误 3：打 v0.0.2 tag 却创建了 v1.0.0 的 Release
 
 **现象**：
+
 - 推送了 `v0.0.2` tag
 - v0.0.2 的 Release 没有 exe 文件
 - 自动创建了 v1.0.0 的 Release，里面有 exe
@@ -60,10 +61,10 @@ publish:
     # 从 tag 提取版本号（移除 'v' 前缀）
     VERSION=${GITHUB_REF#refs/tags/v}
     echo "Tag version: $VERSION"
-    
+
     # 更新 package.json 中的版本号
     npm version $VERSION --no-git-tag-version --allow-same-version
-    
+
     echo "✅ Updated package.json version to $VERSION"
 ```
 
