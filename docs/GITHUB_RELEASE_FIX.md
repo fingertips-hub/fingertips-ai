@@ -24,24 +24,24 @@
 
 ## ✅ 解决方案
 
-### 1. 修改 electron-builder.yml
+### 1. electron-builder.yml 配置
 
 **文件位置**：`electron-builder.yml`
 
-**修改内容**：在 `publish` 配置中添加 `draft: false` 和 `prerelease: false`
+**重要说明**：`draft` 和 `prerelease` **不是** `publish` 配置的有效选项（会导致配置验证错误）。
+
+**正确配置**：
 
 ```yaml
 publish:
   provider: github
   releaseType: release
-  draft: false # ✅ 新增：确保 Release 自动发布，不是草稿
-  prerelease: false # ✅ 新增：确保不是预发布版本
 ```
 
-**作用**：
+**注意**：
 
-- `draft: false`：Release 创建后立即发布，不需要手动操作
-- `prerelease: false`：标记为正式版本，不是预发布版本
+- GitHub provider 只支持特定的选项：`provider`, `releaseType`, `owner`, `repo`, `token` 等
+- `draft` 和 `prerelease` 必须通过 **GitHub API** 在工作流中设置
 
 ### 2. 优化 GitHub Actions 工作流
 
@@ -76,40 +76,52 @@ publish:
 - 如果构建失败，不会尝试发布
 - 更容易定位问题
 
-#### 改进 2：增强日志输出
+#### 改进 2：通过 GitHub API 发布 Release（核心修复）
 
-添加了以下信息到 Release 更新步骤：
+**关键修改**：在工作流中通过 GitHub API 设置 `draft: false` 和 `prerelease: false`
 
-- Release ID 和名称
-- 草稿状态（draft: true/false）
-- 发布时间
-- 所有上传的文件列表及大小
-
-```yaml
-console.log(`Found release: ${release.name} (ID: ${release.id})`);
-console.log(`Release draft status: ${release.draft}`);
-console.log(`Release published at: ${release.published_at || 'Not published'}`);
-
-console.log('\n📦 Release assets:');
-assets.forEach(asset => {
-  console.log(`  - ${asset.name} (${(asset.size / 1024 / 1024).toFixed(2)} MB)`);
-});
+```javascript
+// 更新 release：设置描述、确保不是草稿、不是预发布
+await github.rest.repos.updateRelease({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  release_id: release.id,
+  body: message,
+  draft: false, // ✅ 确保不是草稿
+  prerelease: false // ✅ 确保不是预发布
+})
 ```
 
 **优点**：
 
-- 可以直接在 Actions 日志中验证 exe 文件是否上传成功
-- 查看 Release 状态，确认是否正确发布
-- 便于排查问题
+- ✅ 强制将 Release 设置为已发布状态
+- ✅ 无论 electron-builder 的默认行为如何，都能确保发布成功
+- ✅ 同时更新 Release 描述
 
-#### 改进 3：添加等待时间
+#### 改进 3：增强日志输出
+
+添加了详细的状态信息：
 
 ```javascript
-// 等待一小段时间确保 release 已创建
-await new Promise((resolve) => setTimeout(resolve, 3000))
+console.log(`Release draft status BEFORE: ${release.draft}`)
+console.log(`Release prerelease status BEFORE: ${release.prerelease}`)
+
+// 更新后
+console.log('✅ Release updated successfully')
+console.log('   - Draft: false (published)')
+console.log('   - Prerelease: false')
+
+console.log('\n📦 Release assets:')
+assets.forEach((asset) => {
+  console.log(`  - ${asset.name} (${(asset.size / 1024 / 1024).toFixed(2)} MB)`)
+})
 ```
 
-**作用**：确保 electron-builder 完成 Release 创建后，再更新描述
+**优点**：
+
+- 显示更新前后的状态对比
+- 列出所有上传的文件和大小
+- 如果没有文件会发出警告
 
 ### 3. 更新文档
 
@@ -126,34 +138,37 @@ await new Promise((resolve) => setTimeout(resolve, 3000))
 
 ### 1. electron-builder 发布配置
 
-对于公开项目，建议的完整配置：
+**重要**：`draft` 和 `prerelease` 不能在 `electron-builder.yml` 中配置！
+
+**正确的 electron-builder.yml 配置**：
 
 ```yaml
 publish:
   provider: github
-  releaseType: release # 发布类型
-  draft: false # 不使用草稿
-  prerelease: false # 不是预发布版本
+  releaseType: release # 正式版本
 ```
 
-对于需要人工审核的项目：
+或对于预发布版本：
 
 ```yaml
 publish:
   provider: github
-  releaseType: release
-  draft: true # 使用草稿，需要手动发布
-  prerelease: false
+  releaseType: prerelease # 预发布版本
 ```
 
-对于测试版本：
+**控制 draft 和 prerelease 状态**：
 
-```yaml
-publish:
-  provider: github
-  releaseType: prerelease # 或者 releaseType: release + prerelease: true
-  draft: false
-  prerelease: true # 标记为预发布版本
+必须在 GitHub Actions 工作流中通过 API 设置：
+
+```javascript
+// 在工作流中
+await github.rest.repos.updateRelease({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  release_id: release.id,
+  draft: false, // 是否为草稿
+  prerelease: false // 是否为预发布
+})
 ```
 
 ### 2. 版本号管理
@@ -244,13 +259,15 @@ git tag -d v1.0.1
 
 ### 核心修改
 
-1. **electron-builder.yml**：添加 `draft: false` 和 `prerelease: false`
-2. **release.yml**：分离构建步骤，增强日志输出
-3. **README.md**：更新文档和故障排除指南
+1. **electron-builder.yml**：保持简洁配置（只有 `provider` 和 `releaseType`）
+2. **release.yml**：通过 GitHub API 设置 `draft: false` 和 `prerelease: false`
+3. **release.yml**：分离构建步骤，增强日志输出
+4. **README.md**：更新文档和故障排除指南
 
 ### 关键点
 
-- electron-builder **默认创建草稿 Release**，必须显式设置 `draft: false`
+- ⚠️ `draft` 和 `prerelease` **不能**在 `electron-builder.yml` 中配置（会导致验证错误）
+- ✅ 必须通过 **GitHub API** 在工作流中设置 Release 状态
 - 草稿状态的 Release 中的文件不对外公开
 - GitHub 会为每个 tag 自动创建源码压缩包
 - 增强日志输出可以快速定位问题

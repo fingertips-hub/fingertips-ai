@@ -41,7 +41,5 @@ npmRebuild: false
 publish:
   provider: github
   releaseType: release
-  draft: false
-  prerelease: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

@@ -80,22 +80,24 @@ git push origin v1.0.1
 **解决方法**：
 
 1. 检查Actions标签页的构建日志
-2. 查看"Update release description"步骤，确认已列出exe文件
-3. 如果构建成功但没有exe，检查`electron-builder.yml`中的`draft: false`配置
+2. 查看"Update release and publish"步骤，确认已列出exe文件
+3. 确认日志中显示"Release updated successfully"和"Draft: false (published)"
 
 #### 问题：Release是草稿状态
 
-**原因**：`electron-builder.yml`配置问题
+**原因**：electron-builder 可能默认创建草稿状态的 Release
 
 **解决方法**：
-确保配置中包含：
+已在工作流中通过 GitHub API 自动设置为非草稿状态。查看 "Update release and publish" 步骤确认。
+
+**重要**：❌ 不要在 `electron-builder.yml` 中添加 `draft` 或 `prerelease` 字段，这些不是有效的配置选项，会导致构建失败！
+
+正确的配置：
 
 ```yaml
 publish:
   provider: github
   releaseType: release
-  draft: false
-  prerelease: false
 ```
 
 ### 取消或删除Release

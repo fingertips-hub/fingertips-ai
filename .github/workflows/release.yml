@@ -49,7 +49,7 @@ jobs:
           echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Update release description
+      - name: Update release and publish
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -58,7 +58,7 @@ jobs:
             const message = `${{ steps.tag.outputs.message }}`;
 
             // 等待一小段时间确保 release 已创建
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 5000));
 
             try {
               const { data: release } = await github.rest.repos.getReleaseByTag({
@@ -68,17 +68,23 @@ jobs:
               });
               
               console.log(`Found release: ${release.name} (ID: ${release.id})`);
-              console.log(`Release draft status: ${release.draft}`);
-              console.log(`Release published at: ${release.published_at || 'Not published'}`);
+              console.log(`Release draft status BEFORE: ${release.draft}`);
+              console.log(`Release prerelease status BEFORE: ${release.prerelease}`);
               
+              // 更新 release：设置描述、确保不是草稿、不是预发布
               await github.rest.repos.updateRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id: release.id,
-                body: message
+                body: message,
+                draft: false,        // 确保不是草稿
+                prerelease: false    // 确保不是预发布
               });
               
-              console.log('✅ Release description updated successfully');
+              console.log('✅ Release updated successfully');
+              console.log('   - Draft: false (published)');
+              console.log('   - Prerelease: false');
+              console.log('   - Description updated');
               
               // 列出 release 中的所有资源
               const { data: assets } = await github.rest.repos.listReleaseAssets({
@@ -91,7 +97,11 @@ jobs:
               assets.forEach(asset => {
                 console.log(`  - ${asset.name} (${(asset.size / 1024 / 1024).toFixed(2)} MB)`);
               });
+              
+              if (assets.length === 0) {
+                console.warn('⚠️  No assets found! Build might have failed to upload.');
+              }
             } catch (error) {
-              console.error('❌ Error updating release description:', error);
-              // 不要失败整个工作流
+              console.error('❌ Error updating release:', error);
+              throw error;  // 失败应该让工作流失败
             }
