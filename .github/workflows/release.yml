@@ -25,16 +25,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and publish
+      - name: Build application
+        run: npm run build
+
+      - name: Publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npm run build:win -- --publish always
+        run: npm run build:win -- --publish always
 
-      - name: Get tag message
+      - name: Get version and tag message
         id: tag
         shell: bash
         run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
           git fetch --tags --force
           TAG_MESSAGE=$(git tag -l --format='%(contents)' ${GITHUB_REF#refs/tags/})
           if [ -z "$TAG_MESSAGE" ]; then
@@ -52,12 +57,19 @@ jobs:
             const tag = context.ref.replace('refs/tags/', '');
             const message = `${{ steps.tag.outputs.message }}`;
 
+            // 等待一小段时间确保 release 已创建
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
             try {
               const { data: release } = await github.rest.repos.getReleaseByTag({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag: tag
               });
+              
+              console.log(`Found release: ${release.name} (ID: ${release.id})`);
+              console.log(`Release draft status: ${release.draft}`);
+              console.log(`Release published at: ${release.published_at || 'Not published'}`);
               
               await github.rest.repos.updateRelease({
                 owner: context.repo.owner,
@@ -66,7 +78,20 @@ jobs:
                 body: message
               });
               
-              console.log('Release description updated successfully');
+              console.log('✅ Release description updated successfully');
+              
+              // 列出 release 中的所有资源
+              const { data: assets } = await github.rest.repos.listReleaseAssets({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              });
+              
+              console.log('\n📦 Release assets:');
+              assets.forEach(asset => {
+                console.log(`  - ${asset.name} (${(asset.size / 1024 / 1024).toFixed(2)} MB)`);
+              });
             } catch (error) {
-              console.error('Error updating release description:', error);
+              console.error('❌ Error updating release description:', error);
+              // 不要失败整个工作流
             }

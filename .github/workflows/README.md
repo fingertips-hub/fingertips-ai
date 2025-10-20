@@ -42,9 +42,11 @@ git push origin v1.0.1
 1. 检测到tag推送后自动触发
 2. 设置Node.js环境（版本20）
 3. 安装项目依赖
-4. 构建Windows应用
-5. 自动创建GitHub Release并上传安装包
-6. 使用tag注释作为Release描述
+4. 构建应用程序
+5. 构建Windows安装包并发布到GitHub Releases
+6. 自动创建并**立即发布** Release（非草稿状态）
+7. 使用tag注释更新Release描述
+8. 显示所有上传的文件和大小
 
 ### 产物
 
@@ -58,10 +60,43 @@ git push origin v1.0.1
 - 如果tag包含注释，注释内容会作为Release描述
 - 如果tag没有注释，会使用默认描述："Release v{version}"
 - 工作流使用 `GITHUB_TOKEN`，无需额外配置
+- Release会**自动发布**（不是草稿状态），无需手动发布
+- 构建日志会显示所有上传的文件和大小，便于验证
 
 ### 查看构建状态
 
 在GitHub仓库的 Actions 标签页可以查看构建进度和日志。
+
+### 故障排除
+
+#### 问题：Release只有源码压缩包，没有exe文件
+
+**原因**：可能是以下情况之一
+
+- 构建失败（查看Actions日志）
+- Release处于草稿状态（已修复：现在自动发布）
+- 上传失败（查看Actions日志中的错误）
+
+**解决方法**：
+
+1. 检查Actions标签页的构建日志
+2. 查看"Update release description"步骤，确认已列出exe文件
+3. 如果构建成功但没有exe，检查`electron-builder.yml`中的`draft: false`配置
+
+#### 问题：Release是草稿状态
+
+**原因**：`electron-builder.yml`配置问题
+
+**解决方法**：
+确保配置中包含：
+
+```yaml
+publish:
+  provider: github
+  releaseType: release
+  draft: false
+  prerelease: false
+```
 
 ### 取消或删除Release
 
