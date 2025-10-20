@@ -106,6 +106,7 @@ publish:
 **原因**：`package.json` 中的版本号与 Git tag 不一致
 
 **表现**：
+
 - 推送 `v0.0.2` tag
 - v0.0.2 的 Release 没有 exe
 - 自动创建了 v1.0.0 的 Release，里面有 exe
@@ -115,6 +116,7 @@ publish:
 
 **验证**：
 在 Actions 日志中查找：
+
 ```
 Tag version: 0.0.2
 ✅ Updated package.json version to 0.0.2

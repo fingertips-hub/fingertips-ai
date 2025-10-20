@@ -27,6 +27,7 @@
 **根本原因**：`package.json` 中的版本号与 Git tag 不一致
 
 **问题表现**：
+
 1. 用户推送 `v0.0.2` tag
 2. `package.json` 中的版本是 `"version": "1.0.0"`
 3. electron-builder 读取 `package.json` 的版本号
@@ -74,15 +75,16 @@ publish:
     # 从 tag 提取版本号（移除 'v' 前缀）
     VERSION=${GITHUB_REF#refs/tags/v}
     echo "Tag version: $VERSION"
-    
+
     # 更新 package.json 中的版本号
     npm version $VERSION --no-git-tag-version --allow-same-version
-    
+
     echo "✅ Updated package.json version to $VERSION"
     cat package.json | grep '"version"'
 ```
 
 **效果**：
+
 - ✅ Tag 是 v0.0.2，则构建 fingertips-ai-0.0.2-setup.exe
 - ✅ Tag 是 v1.5.3，则构建 fingertips-ai-1.5.3-setup.exe
 - ✅ 版本号始终与 Git tag 保持一致
