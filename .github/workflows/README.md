@@ -42,11 +42,12 @@ git push origin v1.0.1
 1. 检测到tag推送后自动触发
 2. 设置Node.js环境（版本20）
 3. 安装项目依赖
-4. 构建应用程序
-5. 构建Windows安装包并发布到GitHub Releases
-6. 自动创建并**立即发布** Release（非草稿状态）
-7. 使用tag注释更新Release描述
-8. 显示所有上传的文件和大小
+4. **从Git tag同步版本号到package.json**（确保版本一致）
+5. 构建应用程序
+6. 构建Windows安装包并发布到GitHub Releases
+7. 自动创建并**立即发布** Release（非草稿状态）
+8. 使用tag注释更新Release描述
+9. 显示所有上传的文件和大小
 
 ### 产物
 
@@ -98,6 +99,25 @@ git push origin v1.0.1
 publish:
   provider: github
   releaseType: release
+```
+
+#### 问题：打 v0.0.2 tag 却创建了 v1.0.0 的 Release
+
+**原因**：`package.json` 中的版本号与 Git tag 不一致
+
+**表现**：
+- 推送 `v0.0.2` tag
+- v0.0.2 的 Release 没有 exe
+- 自动创建了 v1.0.0 的 Release，里面有 exe
+
+**解决方法**：
+已在工作流中添加版本号同步步骤。查看 "Update package.json version from tag" 步骤确认。
+
+**验证**：
+在 Actions 日志中查找：
+```
+Tag version: 0.0.2
+✅ Updated package.json version to 0.0.2
 ```
 
 ### 取消或删除Release

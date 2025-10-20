@@ -25,6 +25,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Update package.json version from tag
+        shell: bash
+        run: |
+          # 从 tag 提取版本号（移除 'v' 前缀）
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Tag version: $VERSION"
+          
+          # 更新 package.json 中的版本号
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          
+          echo "✅ Updated package.json version to $VERSION"
+          cat package.json | grep '"version"'
+
       - name: Build application
         run: npm run build
 

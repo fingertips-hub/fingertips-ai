@@ -22,6 +22,20 @@
 
 用户可能手动将 v1.0.0 的 Release 从草稿状态发布为正式版本，所以能看到 exe 文件。
 
+### 为什么打 v0.0.2 tag 却创建了 v1.0.0 的 Release？
+
+**根本原因**：`package.json` 中的版本号与 Git tag 不一致
+
+**问题表现**：
+1. 用户推送 `v0.0.2` tag
+2. `package.json` 中的版本是 `"version": "1.0.0"`
+3. electron-builder 读取 `package.json` 的版本号
+4. 构建出 `fingertips-ai-1.0.0-setup.exe`
+5. 创建或更新 `v1.0.0` 的 Release
+6. 结果：`v0.0.2` 没有 exe，`v1.0.0` 有 exe
+
+**解决方案**：在构建前从 Git tag 自动更新 `package.json` 的版本号，确保两者一致。
+
 ## ✅ 解决方案
 
 ### 1. electron-builder.yml 配置
@@ -47,28 +61,33 @@ publish:
 
 **文件位置**：`.github/workflows/release.yml`
 
-#### 改进 1：分离构建和发布步骤
+#### 改进 1：从 Git tag 同步版本号（关键修复）
 
-**原来**：
+**问题**：如果 `package.json` 中的版本号与 Git tag 不一致，electron-builder 会使用 package.json 的版本号，导致创建错误版本的 Release。
 
-```yaml
-- name: Build and publish
-  env:
-    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  run: npm run build:win -- --publish always
-```
-
-**现在**：
+**解决方案**：在构建前从 Git tag 自动更新 package.json 版本号
 
 ```yaml
-- name: Build application
-  run: npm run build
-
-- name: Publish to GitHub Releases
-  env:
-    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  run: npm run build:win -- --publish always
+- name: Update package.json version from tag
+  shell: bash
+  run: |
+    # 从 tag 提取版本号（移除 'v' 前缀）
+    VERSION=${GITHUB_REF#refs/tags/v}
+    echo "Tag version: $VERSION"
+    
+    # 更新 package.json 中的版本号
+    npm version $VERSION --no-git-tag-version --allow-same-version
+    
+    echo "✅ Updated package.json version to $VERSION"
+    cat package.json | grep '"version"'
 ```
+
+**效果**：
+- ✅ Tag 是 v0.0.2，则构建 fingertips-ai-0.0.2-setup.exe
+- ✅ Tag 是 v1.5.3，则构建 fingertips-ai-1.5.3-setup.exe
+- ✅ 版本号始终与 Git tag 保持一致
+
+#### 改进 2：分离构建和发布步骤
 
 **优点**：
 
@@ -76,7 +95,7 @@ publish:
 - 如果构建失败，不会尝试发布
 - 更容易定位问题
 
-#### 改进 2：通过 GitHub API 发布 Release（核心修复）
+#### 改进 3：通过 GitHub API 发布 Release（核心修复）
 
 **关键修改**：在工作流中通过 GitHub API 设置 `draft: false` 和 `prerelease: false`
 
@@ -98,7 +117,7 @@ await github.rest.repos.updateRelease({
 - ✅ 无论 electron-builder 的默认行为如何，都能确保发布成功
 - ✅ 同时更新 Release 描述
 
-#### 改进 3：增强日志输出
+#### 改进 4：增强日志输出
 
 添加了详细的状态信息：
 
@@ -260,12 +279,15 @@ git tag -d v1.0.1
 ### 核心修改
 
 1. **electron-builder.yml**：保持简洁配置（只有 `provider` 和 `releaseType`）
-2. **release.yml**：通过 GitHub API 设置 `draft: false` 和 `prerelease: false`
-3. **release.yml**：分离构建步骤，增强日志输出
-4. **README.md**：更新文档和故障排除指南
+2. **release.yml**：从 Git tag 自动同步版本号到 package.json（避免版本不匹配）
+3. **release.yml**：通过 GitHub API 设置 `draft: false` 和 `prerelease: false`
+4. **release.yml**：分离构建步骤，增强日志输出
+5. **README.md**：更新文档和故障排除指南
 
 ### 关键点
 
+- ⚠️ **版本号必须一致**：package.json 的版本号必须与 Git tag 匹配，否则会创建错误版本的 Release
+- ✅ **自动同步版本号**：工作流会在构建前从 Git tag 更新 package.json
 - ⚠️ `draft` 和 `prerelease` **不能**在 `electron-builder.yml` 中配置（会导致验证错误）
 - ✅ 必须通过 **GitHub API** 在工作流中设置 Release 状态
 - 草稿状态的 Release 中的文件不对外公开

@@ -20,6 +20,17 @@ Invalid configuration object. electron-builder has been initialized using a conf
 
 **解决**：✅ 通过 GitHub API 在工作流中设置 `draft: false`
 
+### 错误 3：打 v0.0.2 tag 却创建了 v1.0.0 的 Release
+
+**现象**：
+- 推送了 `v0.0.2` tag
+- v0.0.2 的 Release 没有 exe 文件
+- 自动创建了 v1.0.0 的 Release，里面有 exe
+
+**原因**：`package.json` 中的版本号是 `1.0.0`，与 Git tag `v0.0.2` 不一致
+
+**解决**：✅ 在工作流中从 Git tag 自动更新 package.json 版本号
+
 ---
 
 ## ✅ 正确配置
@@ -40,7 +51,25 @@ publish:
 
 ### .github/workflows/release.yml
 
-在工作流中通过 API 控制发布状态：
+#### 1. 同步版本号（必须在构建前执行）
+
+```yaml
+- name: Update package.json version from tag
+  shell: bash
+  run: |
+    # 从 tag 提取版本号（移除 'v' 前缀）
+    VERSION=${GITHUB_REF#refs/tags/v}
+    echo "Tag version: $VERSION"
+    
+    # 更新 package.json 中的版本号
+    npm version $VERSION --no-git-tag-version --allow-same-version
+    
+    echo "✅ Updated package.json version to $VERSION"
+```
+
+**作用**：确保 package.json 版本号与 Git tag 一致，避免创建错误版本的 Release
+
+#### 2. 通过 API 控制发布状态
 
 ```yaml
 - name: Update release and publish
