@@ -2,17 +2,94 @@
   <div class="flex flex-col h-full">
     <!-- 顶部返回按钮 -->
     <div class="flex items-center gap-2 mb-4 flex-shrink-0">
-      <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors" @click="emit('back')">
+      <button
+        class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        @click="showAppList ? (showAppList = false) : emit('back')"
+      >
         <Icon icon="mdi:arrow-left" class="text-xl text-gray-600" />
       </button>
       <h2 class="text-lg font-semibold text-gray-800">
-        {{ mode === 'edit' ? '编辑文件' : '添加文件' }}
+        {{ showAppList ? '选择已安装应用' : mode === 'edit' ? '编辑文件' : '添加文件' }}
       </h2>
     </div>
 
-    <!-- 主体区域 - 支持滚动 -->
-    <div class="flex-1 min-h-0 max-h-[400px] overflow-y-auto pr-2">
+    <!-- 应用列表视图 -->
+    <div v-if="showAppList" class="flex-1 min-h-0 flex flex-col space-y-3">
+      <!-- 搜索框 -->
+      <div class="flex-shrink-0">
+        <div class="relative">
+          <Icon
+            icon="mdi:magnify"
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
+          />
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="搜索应用..."
+          />
+        </div>
+      </div>
+
+      <!-- 应用列表 -->
+      <div class="flex-1 min-h-0 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+        <div v-if="loadingApps" class="flex items-center justify-center py-12">
+          <Icon icon="mdi:loading" class="text-4xl text-blue-500 animate-spin" />
+        </div>
+        <div v-else-if="filteredApps.length === 0" class="text-center py-12 text-gray-500">
+          <Icon icon="mdi:application-outline" class="text-5xl mx-auto mb-2 opacity-50" />
+          <p>{{ searchQuery ? '未找到匹配的应用' : '未找到已安装应用' }}</p>
+        </div>
+        <div v-else class="space-y-1">
+          <button
+            v-for="app in filteredApps"
+            :key="app.path"
+            class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-blue-50 transition-colors text-left group"
+            @click="handleSelectApp(app.path)"
+          >
+            <div class="w-8 h-8 flex-shrink-0">
+              <Icon
+                icon="mdi:application"
+                class="text-2xl text-gray-400 group-hover:text-blue-500"
+              />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-gray-800 truncate group-hover:text-blue-600">
+                {{ app.name }}
+              </div>
+              <div class="text-xs text-gray-500 truncate">{{ app.category }}</div>
+            </div>
+            <Icon
+              icon="mdi:chevron-right"
+              class="text-xl text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件选择视图（原有内容） -->
+    <div v-else class="flex-1 min-h-0 max-h-[400px] overflow-y-auto pr-2">
       <div class="space-y-4">
+        <!-- 浏览已安装应用按钮 -->
+        <div>
+          <button
+            class="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow"
+            @click="handleBrowseApps"
+          >
+            <Icon icon="mdi:microsoft-windows" class="text-xl" />
+            <span>浏览已安装应用</span>
+          </button>
+          <p class="text-xs text-gray-500 text-center mt-2">包括微软应用商店安装的应用</p>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="flex items-center gap-3">
+          <div class="flex-1 border-t border-gray-300"></div>
+          <span class="text-sm text-gray-500">或</span>
+          <div class="flex-1 border-t border-gray-300"></div>
+        </div>
+
         <!-- 文件选择/拖拽区域 (合并) -->
         <div>
           <div
@@ -101,8 +178,8 @@
       </div>
     </div>
 
-    <!-- 底部确认按钮 - 固定在底部 -->
-    <div class="mt-6 pt-4">
+    <!-- 底部确认按钮 - 固定在底部 (仅在文件选择视图显示) -->
+    <div v-if="!showAppList" class="mt-6 pt-4">
       <button
         class="w-full px-4 py-3 rounded-lg font-medium transition-all"
         :class="
@@ -120,7 +197,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { FileInfo } from '../../types/launcher'
 import { useToast } from '../../composables/useToast'
@@ -152,6 +229,24 @@ const iconData = ref<string | null>(null)
 const displayName = ref('')
 const dropZoneRef = ref<HTMLElement | null>(null)
 
+// 应用列表相关状态
+const showAppList = ref(false)
+const loadingApps = ref(false)
+const installedApps = ref<Array<{ name: string; path: string; category: string }>>([])
+const searchQuery = ref('')
+
+// 过滤后的应用列表
+const filteredApps = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return installedApps.value
+  }
+
+  const query = searchQuery.value.toLowerCase()
+  return installedApps.value.filter(
+    (app) => app.name.toLowerCase().includes(query) || app.category.toLowerCase().includes(query)
+  )
+})
+
 // 编辑模式下初始化数据
 onMounted(() => {
   if (props.mode === 'edit' && props.initialData) {
@@ -160,6 +255,46 @@ onMounted(() => {
     displayName.value = props.initialData.fileInfo.name
   }
 })
+
+/**
+ * 浏览已安装应用
+ */
+async function handleBrowseApps(): Promise<void> {
+  try {
+    loadingApps.value = true
+    showAppList.value = true
+
+    // 加载已安装应用列表
+    const apps = await window.api.launcher.scanInstalledApps()
+    installedApps.value = apps
+
+    if (apps.length === 0) {
+      toast.warning('未找到已安装应用')
+    }
+  } catch (error) {
+    console.error('Error loading installed apps:', error)
+    toast.error('加载应用列表失败')
+  } finally {
+    loadingApps.value = false
+  }
+}
+
+/**
+ * 选择应用
+ */
+async function handleSelectApp(appPath: string): Promise<void> {
+  try {
+    loading.value = true
+    showAppList.value = false
+
+    await processFile(appPath)
+  } catch (error) {
+    console.error('Error selecting app:', error)
+    toast.error('加载应用失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 /**
  * 处理文件选择
@@ -321,3 +456,24 @@ function handleConfirm(): void {
   })
 }
 </script>
+
+<style scoped>
+/* 自定义滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+</style>

@@ -27,6 +27,11 @@ const api = {
     isFolder: (path: string) => ipcRenderer.invoke('launcher:is-folder', path),
     // 获取文件夹信息
     getFolderInfo: (path: string) => ipcRenderer.invoke('launcher:get-folder-info', path),
+    // 扫描已安装的应用（从开始菜单）
+    scanInstalledApps: () =>
+      ipcRenderer.invoke('launcher:scan-installed-apps') as Promise<
+        Array<{ name: string; path: string; category: string }>
+      >,
     // 获取网站 favicon
     fetchFavicon: (url: string) => ipcRenderer.invoke('launcher:fetch-favicon', url),
     // 从 File 对象获取路径 (使用 webUtils.getPathForFile)

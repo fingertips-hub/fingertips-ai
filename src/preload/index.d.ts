@@ -20,6 +20,7 @@ interface API {
     selectFolder: () => Promise<string | null>
     isFolder: (path: string) => Promise<boolean>
     getFolderInfo: (path: string) => Promise<FileInfo | null>
+    scanInstalledApps: () => Promise<Array<{ name: string; path: string; category: string }>>
     fetchFavicon: (url: string) => Promise<string | null>
     getFilePath: (file: File) => string | null
   }

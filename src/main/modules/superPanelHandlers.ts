@@ -252,6 +252,190 @@ export function setupSuperPanelHandlers(): void {
   })
 
   /**
+   * 扫描已安装的应用（从开始菜单）
+   * 返回应用快捷方式列表，包括微软应用商店应用
+   */
+  ipcMain.handle('launcher:scan-installed-apps', async () => {
+    try {
+      console.log('Scanning installed apps from Start Menu...')
+      const fs = await import('fs/promises')
+      const { join } = await import('path')
+      const os = await import('os')
+
+      // 常见的开始菜单位置
+      const startMenuPaths = [
+        // 所有用户的开始菜单（包括微软应用商店应用）
+        'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs',
+        // 当前用户的开始菜单
+        join(os.homedir(), 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs')
+      ]
+
+      const apps: Array<{
+        name: string
+        path: string
+        category: string
+      }> = []
+
+      // 递归扫描目录，查找 .lnk 文件
+      async function scanDirectory(dirPath: string, category: string = '其他'): Promise<void> {
+        try {
+          const entries = await fs.readdir(dirPath, { withFileTypes: true })
+
+          for (const entry of entries) {
+            const fullPath = join(dirPath, entry.name)
+
+            if (entry.isDirectory()) {
+              // 递归扫描子目录（使用目录名作为分类）
+              await scanDirectory(fullPath, entry.name)
+            } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.lnk')) {
+              // 过滤掉卸载程序等不需要的快捷方式
+              if (
+                !entry.name.toLowerCase().includes('uninstall') &&
+                !entry.name.toLowerCase().includes('卸载') &&
+                !entry.name.toLowerCase().includes('readme')
+              ) {
+                apps.push({
+                  name: basename(entry.name, '.lnk'),
+                  path: fullPath,
+                  category: category
+                })
+              }
+            }
+          }
+        } catch {
+          // 忽略无法访问的目录
+          console.log(`Cannot access directory: ${dirPath}`)
+        }
+      }
+
+      // 扫描所有开始菜单位置
+      for (const startMenuPath of startMenuPaths) {
+        try {
+          await scanDirectory(startMenuPath, '全部应用')
+        } catch {
+          console.log(`Cannot scan: ${startMenuPath}`)
+        }
+      }
+
+      // 添加常用系统工具
+      console.log('Adding system utilities...')
+      const systemTools = [
+        { name: '记事本', exe: 'notepad.exe', path: 'C:\\Windows\\System32\\notepad.exe' },
+        { name: '计算器', exe: 'calc.exe', path: 'C:\\Windows\\System32\\calc.exe' },
+        { name: '画图', exe: 'mspaint.exe', path: 'C:\\Windows\\System32\\mspaint.exe' },
+        {
+          name: '写字板',
+          exe: 'write.exe',
+          path: 'C:\\Program Files\\Windows NT\\Accessories\\wordpad.exe'
+        },
+        {
+          name: '截图工具',
+          exe: 'SnippingTool.exe',
+          path: 'C:\\Windows\\System32\\SnippingTool.exe'
+        },
+        {
+          name: '截图和草图',
+          exe: 'ScreenSketch.exe',
+          path: 'C:\\Windows\\System32\\ScreenSketch.exe'
+        },
+        { name: '任务管理器', exe: 'taskmgr.exe', path: 'C:\\Windows\\System32\\taskmgr.exe' },
+        { name: '控制面板', exe: 'control.exe', path: 'C:\\Windows\\System32\\control.exe' },
+        {
+          name: '注册表编辑器',
+          exe: 'regedit.exe',
+          path: 'C:\\Windows\\regedit.exe'
+        },
+        {
+          name: '命令提示符',
+          exe: 'cmd.exe',
+          path: 'C:\\Windows\\System32\\cmd.exe'
+        },
+        {
+          name: 'PowerShell',
+          exe: 'powershell.exe',
+          path: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+        },
+        {
+          name: '资源监视器',
+          exe: 'resmon.exe',
+          path: 'C:\\Windows\\System32\\resmon.exe'
+        },
+        {
+          name: '磁盘清理',
+          exe: 'cleanmgr.exe',
+          path: 'C:\\Windows\\System32\\cleanmgr.exe'
+        },
+        {
+          name: '磁盘碎片整理',
+          exe: 'dfrgui.exe',
+          path: 'C:\\Windows\\System32\\dfrgui.exe'
+        },
+        {
+          name: '系统信息',
+          exe: 'msinfo32.exe',
+          path: 'C:\\Windows\\System32\\msinfo32.exe'
+        },
+        {
+          name: '设备管理器',
+          exe: 'devmgmt.msc',
+          path: 'C:\\Windows\\System32\\devmgmt.msc'
+        },
+        {
+          name: '服务',
+          exe: 'services.msc',
+          path: 'C:\\Windows\\System32\\services.msc'
+        },
+        {
+          name: '事件查看器',
+          exe: 'eventvwr.msc',
+          path: 'C:\\Windows\\System32\\eventvwr.msc'
+        },
+        {
+          name: '远程桌面连接',
+          exe: 'mstsc.exe',
+          path: 'C:\\Windows\\System32\\mstsc.exe'
+        },
+        {
+          name: '字符映射表',
+          exe: 'charmap.exe',
+          path: 'C:\\Windows\\System32\\charmap.exe'
+        }
+      ]
+
+      // 检查系统工具是否存在并添加到列表
+      const { existsSync } = await import('fs')
+      for (const tool of systemTools) {
+        if (existsSync(tool.path)) {
+          // 检查是否已经在列表中（避免重复）
+          const exists = apps.some((app) => app.path.toLowerCase() === tool.path.toLowerCase())
+          if (!exists) {
+            apps.push({
+              name: tool.name,
+              path: tool.path,
+              category: '系统工具'
+            })
+          }
+        }
+      }
+
+      // 按分类和名称排序（系统工具排在前面）
+      apps.sort((a, b) => {
+        // 系统工具优先
+        if (a.category === '系统工具' && b.category !== '系统工具') return -1
+        if (a.category !== '系统工具' && b.category === '系统工具') return 1
+        // 同分类按名称排序
+        return a.name.localeCompare(b.name, 'zh-CN')
+      })
+
+      console.log(`Found ${apps.length} installed apps (including system utilities)`)
+      return apps
+    } catch (error) {
+      console.error('Error scanning installed apps:', error)
+      return []
+    }
+  })
+
+  /**
    * 获取网站 favicon
    * 在主进程中获取，避免 CORS 问题
    */
@@ -322,6 +506,7 @@ export function cleanupSuperPanelHandlers(): void {
   ipcMain.removeHandler('launcher:select-folder')
   ipcMain.removeHandler('launcher:is-folder')
   ipcMain.removeHandler('launcher:get-folder-info')
+  ipcMain.removeHandler('launcher:scan-installed-apps')
   ipcMain.removeHandler('launcher:fetch-favicon')
 
   console.log('Super Panel IPC handlers cleaned up')
