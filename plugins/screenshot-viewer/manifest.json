@@ -1,0 +1,22 @@
+{
+  "id": "screenshot-viewer",
+  "name": "截图查看器",
+  "version": "1.0.0",
+  "description": "点击后进行截图，并在新窗口中显示截图结果",
+  "keywords": ["screenshot", "viewer", "image", "截图"],
+  "author": "Fingertips AI",
+  "icon": "icon.png",
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+  "main": "index.js",
+  "permissions": ["screenshot", "window", "notification"],
+  "ui": {
+    "hasSettings": false,
+    "hasPanel": false
+  },
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": false
+  }
+}

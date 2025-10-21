@@ -14,7 +14,8 @@ export enum PluginPermission {
   CLIPBOARD = 'clipboard', // 访问剪贴板
   WINDOW = 'window', // 创建和管理窗口
   NETWORK = 'network', // 网络请求（未来）
-  SHELL = 'shell' // 执行 Shell 命令（未来，高风险）
+  SHELL = 'shell', // 执行 Shell 命令（未来，高风险）
+  SCREENSHOT = 'screenshot' // 截图功能
 }
 
 /**
@@ -109,6 +110,13 @@ export interface PluginAPIClipboard {
 }
 
 /**
+ * 插件 API - Screenshot
+ */
+export interface PluginAPIScreenshot {
+  capture(): Promise<string> // 返回截图的 DataURL，如果取消则返回空字符串
+}
+
+/**
  * 插件 API - File System (受限)
  */
 export interface PluginAPIFileSystem {
@@ -185,6 +193,7 @@ export interface PluginAPI {
   fs: PluginAPIFileSystem
   ipc: PluginAPIIPC
   window: PluginAPIWindow
+  screenshot: PluginAPIScreenshot
 }
 
 /**

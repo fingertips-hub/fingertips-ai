@@ -54,7 +54,7 @@ class PluginWindowManager {
           webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: true,
+            sandbox: false, // 与主窗口保持一致，避免 preload 注入问题
             webSecurity: true,
             allowRunningInsecureContent: false,
             // 使用应用的 preload 脚本

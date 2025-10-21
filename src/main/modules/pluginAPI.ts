@@ -1,6 +1,7 @@
 import { dialog, clipboard, Notification, ipcMain } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
+import { execFile } from 'child_process'
 import type {
   PluginAPI,
   PluginManifest,
@@ -288,6 +289,45 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
   }
 
   /**
+   * Screenshot API
+   */
+  const screenshotAPI = {
+    async capture(): Promise<string> {
+      if (!hasPermission(manifest, 'screenshot' as PluginPermission)) {
+        throw new Error(`Plugin ${manifest.id} does not have permission: screenshot`)
+      }
+
+      return new Promise<string>((resolve) => {
+        // 获取 ScreenCapture.exe 的路径
+        // 在开发环境下使用项目根目录的 resources，在打包后使用 process.resourcesPath
+        const isDev = !app.isPackaged
+        const screenshotToolPath = isDev
+          ? path.join(app.getAppPath(), 'resources', 'tools', 'ScreenCapture.exe')
+          : path.join(process.resourcesPath, 'tools', 'ScreenCapture.exe')
+
+        const screenProcess = execFile(screenshotToolPath)
+
+        screenProcess.on('exit', (code) => {
+          if (code) {
+            // 进程退出，尝试从剪贴板读取图片
+            const image = clipboard.readImage()
+            const dataURL = image.isEmpty() ? '' : image.toDataURL()
+            resolve(dataURL)
+          } else {
+            // 用户取消截图
+            resolve('')
+          }
+        })
+
+        screenProcess.on('error', (err) => {
+          console.error('Screenshot error:', err)
+          resolve('')
+        })
+      })
+    }
+  }
+
+  /**
    * Window API
    */
   const windowAPI = {
@@ -356,7 +396,8 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
     clipboard: clipboardAPI,
     fs: fsAPI,
     ipc: ipcAPI,
-    window: windowAPI
+    window: windowAPI,
+    screenshot: screenshotAPI
   }
 }
 

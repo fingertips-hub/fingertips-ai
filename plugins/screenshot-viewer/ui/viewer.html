@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>截图查看器</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .header {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .header h1 {
+        color: white;
+        font-size: 18px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .header .icon {
+        font-size: 24px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn-primary {
+        background: rgba(76, 175, 80, 0.8);
+        border-color: rgba(76, 175, 80, 0.9);
+      }
+
+      .btn-primary:hover {
+        background: rgba(76, 175, 80, 1);
+      }
+
+      .container {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .image-wrapper {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+
+      #screenshot {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        object-fit: contain;
+      }
+
+      .loading {
+        text-align: center;
+        color: white;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-text {
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .status-bar {
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+        padding: 8px 20px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .zoom-info {
+        opacity: 0.7;
+      }
+
+      /* 图片缩放功能 */
+      .zoomable {
+        cursor: zoom-in;
+        transition: transform 0.3s ease;
+      }
+
+      .zoomable.zoomed {
+        cursor: zoom-out;
+        transform: scale(1);
+        width: auto !important;
+        max-width: none !important;
+        max-height: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 头部 -->
+    <div class="header">
+      <h1>
+        <span class="icon">📸</span>
+        <span>截图查看器</span>
+      </h1>
+      <div class="toolbar">
+        <button class="btn" id="copyBtn" title="复制到剪贴板">📋 复制</button>
+        <button class="btn btn-primary" id="saveBtn" title="保存到文件">💾 保存</button>
+      </div>
+    </div>
+
+    <!-- 主要内容区 -->
+    <div class="container">
+      <!-- 加载状态 -->
+      <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载截图...</div>
+      </div>
+
+      <!-- 图片显示区 -->
+      <div class="image-wrapper hidden" id="imageWrapper">
+        <img id="screenshot" alt="截图" class="zoomable" />
+      </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar">
+      <div id="imageInfo">等待加载...</div>
+      <div class="zoom-info">点击图片可放大/缩小</div>
+    </div>
+
+    <script>
+      let currentDataURL = ''
+      let isZoomed = false
+
+      /**
+       * 等待 Electron API 准备就绪
+       * 在某些情况下 preload 脚本的注入需要一点时间
+       */
+      async function waitForElectronAPI(timeout = 5000) {
+        const startTime = Date.now()
+
+        while (Date.now() - startTime < timeout) {
+          if (window.electron && window.electron.ipcRenderer) {
+            console.log('Electron API 已准备就绪')
+            return true
+          }
+          // 等待 50ms 后重试
+          await new Promise((resolve) => setTimeout(resolve, 50))
+        }
+
+        console.error('等待 Electron API 超时')
+        console.log('window.electron:', window.electron)
+        console.log('可用的 window 属性:', Object.keys(window))
+        return false
+      }
+
+      // 页面加载完成后请求截图数据
+      window.addEventListener('DOMContentLoaded', async () => {
+        console.log('截图查看器页面已加载')
+
+        try {
+          // 等待 electron API 可用
+          const apiReady = await waitForElectronAPI()
+          if (!apiReady) {
+            throw new Error('Electron API 不可用（超时）')
+          }
+
+          // 请求截图数据（IPC channel 会自动加上插件 ID 前缀）
+          console.log('正在请求截图数据...')
+          const response = await window.electron.ipcRenderer.invoke(
+            'plugin:screenshot-viewer:request-screenshot'
+          )
+
+          console.log('收到截图数据响应:', response)
+
+          if (response && response.success && response.dataURL) {
+            currentDataURL = response.dataURL
+            displayScreenshot(response.dataURL)
+          } else {
+            throw new Error('未获取到截图数据')
+          }
+        } catch (error) {
+          console.error('加载截图失败:', error)
+          document.getElementById('loading').innerHTML = `
+            <div class="loading-text" style="color: #ff6b6b;">
+              ⚠️ 加载失败: ${error.message}
+            </div>
+          `
+        }
+      })
+
+      // 显示截图
+      function displayScreenshot(dataURL) {
+        const img = document.getElementById('screenshot')
+        const loading = document.getElementById('loading')
+        const imageWrapper = document.getElementById('imageWrapper')
+
+        img.onload = () => {
+          // 隐藏加载提示
+          loading.classList.add('hidden')
+          imageWrapper.classList.remove('hidden')
+
+          // 更新状态栏信息
+          updateImageInfo(img)
+        }
+
+        img.onerror = () => {
+          console.error('图片加载失败')
+          loading.innerHTML = `
+            <div class="loading-text" style="color: #ff6b6b;">
+              ⚠️ 图片加载失败
+            </div>
+          `
+        }
+
+        img.src = dataURL
+      }
+
+      // 更新图片信息
+      function updateImageInfo(img) {
+        const info = document.getElementById('imageInfo')
+        const width = img.naturalWidth
+        const height = img.naturalHeight
+        const size = Math.round((currentDataURL.length * 3) / 4 / 1024) // 估算大小（KB）
+
+        info.textContent = `尺寸: ${width} × ${height} | 大小: ~${size} KB`
+      }
+
+      // 图片点击放大/缩小
+      document.getElementById('screenshot').addEventListener('click', function () {
+        isZoomed = !isZoomed
+        this.classList.toggle('zoomed', isZoomed)
+
+        if (isZoomed) {
+          // 放大时允许滚动
+          document.querySelector('.image-wrapper').style.overflow = 'auto'
+        } else {
+          // 缩小时禁止滚动
+          document.querySelector('.image-wrapper').style.overflow = 'hidden'
+        }
+      })
+
+      // 复制按钮
+      document.getElementById('copyBtn').addEventListener('click', async () => {
+        if (!currentDataURL) {
+          showNotification('没有可复制的截图', 'error')
+          return
+        }
+
+        try {
+          // 将 DataURL 转换为 Blob
+          const response = await fetch(currentDataURL)
+          const blob = await response.blob()
+
+          // 复制到剪贴板
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              [blob.type]: blob
+            })
+          ])
+
+          showNotification('已复制到剪贴板', 'success')
+        } catch (error) {
+          console.error('复制失败:', error)
+          showNotification('复制失败: ' + error.message, 'error')
+        }
+      })
+
+      // 保存按钮
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        if (!currentDataURL) {
+          showNotification('没有可保存的截图', 'error')
+          return
+        }
+
+        try {
+          // 创建下载链接
+          const link = document.createElement('a')
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+          link.download = `screenshot_${timestamp}.png`
+          link.href = currentDataURL
+          link.click()
+
+          showNotification('截图已保存', 'success')
+        } catch (error) {
+          console.error('保存失败:', error)
+          showNotification('保存失败: ' + error.message, 'error')
+        }
+      })
+
+      // 显示通知（简单实现）
+      function showNotification(message, type = 'info') {
+        // 创建通知元素
+        const notification = document.createElement('div')
+        notification.textContent = message
+        notification.style.cssText = `
+          position: fixed;
+          top: 80px;
+          right: 20px;
+          background: ${type === 'success' ? 'rgba(76, 175, 80, 0.9)' : 'rgba(244, 67, 54, 0.9)'};
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          z-index: 1000;
+          animation: slideIn 0.3s ease;
+          backdrop-filter: blur(10px);
+        `
+
+        document.body.appendChild(notification)
+
+        // 3秒后移除
+        setTimeout(() => {
+          notification.style.animation = 'slideOut 0.3s ease'
+          setTimeout(() => notification.remove(), 300)
+        }, 3000)
+      }
+
+      // 添加动画样式
+      const style = document.createElement('style')
+      style.textContent = `
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes slideOut {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+        }
+      `
+      document.head.appendChild(style)
+    </script>
+  </body>
+</html>
