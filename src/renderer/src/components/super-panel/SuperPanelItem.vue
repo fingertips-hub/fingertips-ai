@@ -511,8 +511,31 @@ async function launchApp(): Promise<void> {
   if (!item.value) return
 
   try {
+    let pathToExecute = item.value.path
+
+    // 如果是 CMD 类型且包含 [TEXT] 占位符，需要替换为选中的文本
+    if (item.value.type === 'cmd' && pathToExecute.includes('[TEXT]')) {
+      // 获取捕获的选中文本
+      let capturedText = ''
+      try {
+        capturedText = await window.api.superPanel.getCapturedText()
+      } catch (err) {
+        console.error('[SuperPanelItem] 获取捕获文本失败:', err)
+      }
+
+      // 如果没有选中文本，提示用户
+      if (!capturedText.trim()) {
+        toast.warning('命令需要选中文本，请先选中文本后再执行')
+        return
+      }
+
+      // 替换所有 [TEXT] 占位符
+      pathToExecute = pathToExecute.replace(/\[TEXT\]/g, capturedText)
+      console.log('[SuperPanelItem] 占位符替换完成:', pathToExecute)
+    }
+
     const success = await window.api.launcher.launchApp(
-      item.value.path,
+      pathToExecute,
       item.value.type,
       item.value.shellType
     )

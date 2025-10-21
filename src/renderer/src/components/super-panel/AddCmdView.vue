@@ -11,7 +11,7 @@
     </div>
 
     <!-- 主体区域 - 支持滚动 -->
-    <div class="flex-1 min-h-0 max-h-[410px] overflow-y-auto pr-2">
+    <div class="flex-1 min-h-0 max-h-[420px] overflow-y-auto pr-2">
       <div class="space-y-4">
         <!-- 显示名称输入 -->
         <div>
@@ -104,7 +104,7 @@
               {{ shellType === 'cmd' ? 'CMD命令' : 'PowerShell命令' }}
             </label>
             <!-- 操作按钮组 -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
               <!-- 测试按钮 -->
               <button
                 type="button"
@@ -152,6 +152,7 @@
           </div>
           <div class="relative p-1">
             <textarea
+              ref="commandTextarea"
               v-model="command"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono text-sm"
               :placeholder="
@@ -163,7 +164,15 @@
               maxlength="500"
             />
           </div>
-          <div class="mt-1 text-xs text-gray-400">{{ command.length }}/500 字符</div>
+          <div class="mt-1 flex items-start justify-between gap-2">
+            <div class="text-xs text-gray-500 flex-1">
+              <Icon icon="mdi:information-outline" class="inline text-blue-500" />
+              使用
+              <code class="px-1 py-0.5 bg-gray-100 rounded text-gray-700 font-mono">[TEXT]</code>
+              占位符，执行时会替换为选中的文本
+            </div>
+            <div class="text-xs text-gray-400 flex-shrink-0">{{ command.length }}/500</div>
+          </div>
         </div>
       </div>
     </div>
@@ -219,6 +228,7 @@ const shellType = ref<'cmd' | 'powershell'>('cmd')
 const dropdownOpen = ref(false)
 const isGenerating = ref(false) // AI 生成状态
 const isTesting = ref(false) // 测试状态
+const commandTextarea = ref<HTMLTextAreaElement | null>(null) // 命令输入框引用
 // 使用默认图标
 const selectedIcon = 'mdi:console'
 
@@ -313,11 +323,20 @@ async function handleTestCommand(): Promise<void> {
     return
   }
 
-  const testCommand = command.value.trim()
+  let testCommand = command.value.trim()
+
+  // 如果命令包含 [TEXT] 占位符，用示例文本替换
+  if (testCommand.includes('[TEXT]')) {
+    const exampleText = '示例文本'
+    testCommand = testCommand.replace(/\[TEXT\]/g, exampleText)
+    toast.info(`使用示例文本 "${exampleText}" 测试命令...`)
+  }
 
   try {
     isTesting.value = true
-    toast.info('正在测试命令...')
+    if (!testCommand.includes('[TEXT]')) {
+      toast.info('正在测试命令...')
+    }
 
     // 调用 launcher API 执行命令
     const result = await window.api.launcher.launchApp(testCommand, 'cmd', shellType.value)

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-2 h-full">
+  <div class="flex flex-col gap-2 h-full" @wheel="handleWheel">
     <!-- 顶部工具栏 -->
     <div class="flex items-center justify-between flex-shrink-0 px-2">
       <!-- 页面标题 -->
@@ -101,6 +101,10 @@ const dialogMode = ref<'create' | 'edit'>('create')
 // 确认删除对话框状态
 const confirmDeleteVisible = ref(false)
 
+// 滚轮切换防抖控制
+const isWheelThrottled = ref(false)
+const WHEEL_THROTTLE_DELAY = 300 // 300ms 的节流延迟
+
 // 当前页面标题
 const currentPageTitle = computed(() => actionPageStore.currentPage?.title || '默认')
 
@@ -187,6 +191,42 @@ function handleDialogConfirm(value: string): void {
       actionPageStore.updatePageTitle(actionPageStore.currentPageId, value)
     }
   }
+}
+
+/**
+ * 处理鼠标滚轮事件
+ * 向上滚动切换到上一页，向下滚动切换到下一页
+ */
+function handleWheel(event: WheelEvent): void {
+  // 如果正在节流中，忽略事件
+  if (isWheelThrottled.value) return
+
+  // 判断滚动方向
+  const isScrollingDown = event.deltaY > 0
+  const isScrollingUp = event.deltaY < 0
+
+  // 向上滚动且可以切换到上一页
+  if (isScrollingUp && canGoPrevious.value) {
+    event.preventDefault() // 阻止默认滚动行为
+    actionPageStore.previousPage()
+    throttleWheel()
+  }
+  // 向下滚动且可以切换到下一页
+  else if (isScrollingDown && canGoNext.value) {
+    event.preventDefault() // 阻止默认滚动行为
+    actionPageStore.nextPage()
+    throttleWheel()
+  }
+}
+
+/**
+ * 节流控制：在指定延迟内不响应新的滚轮事件
+ */
+function throttleWheel(): void {
+  isWheelThrottled.value = true
+  setTimeout(() => {
+    isWheelThrottled.value = false
+  }, WHEEL_THROTTLE_DELAY)
 }
 </script>
 
