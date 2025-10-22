@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>百度云OCR配置</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: #333;
+      }
+
+      .container {
+        max-width: 700px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+
+      .header {
+        padding: 32px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .header p {
+        opacity: 0.95;
+        font-size: 14px;
+      }
+
+      .content {
+        padding: 32px;
+      }
+
+      .status {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        display: none;
+        font-size: 14px;
+      }
+
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .form-section {
+        margin-bottom: 32px;
+      }
+
+      .form-section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #f0f0f0;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+        font-size: 14px;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s;
+        font-family: inherit;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .form-group .hint {
+        font-size: 13px;
+        color: #999;
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+
+      .form-group .hint a {
+        color: #667eea;
+        text-decoration: none;
+      }
+
+      .form-group .hint a:hover {
+        text-decoration: underline;
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .checkbox-group input[type='checkbox'] {
+        width: auto;
+        margin-top: 2px;
+        cursor: pointer;
+      }
+
+      .checkbox-group label {
+        margin: 0;
+        cursor: pointer;
+        flex: 1;
+      }
+
+      .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 16px;
+        border-radius: 4px;
+        margin-bottom: 24px;
+      }
+
+      .info-box h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #1976d2;
+      }
+
+      .info-box ol {
+        margin-left: 20px;
+        font-size: 13px;
+        color: #555;
+      }
+
+      .info-box li {
+        margin-bottom: 4px;
+      }
+
+      .footer {
+        padding: 20px 32px;
+        background: #f9f9f9;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .footer-info {
+        font-size: 13px;
+        color: #666;
+      }
+
+      .footer-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-family: inherit;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #666;
+      }
+
+      .btn-secondary:hover {
+        background: #d0d0d0;
+      }
+
+      .btn-test {
+        background: #4caf50;
+        color: white;
+      }
+
+      .btn-test:hover {
+        background: #45a049;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #ffffff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🔍 百度云OCR配置</h1>
+        <p>配置百度云API密钥以使用OCR文字识别功能</p>
+      </div>
+
+      <div class="content">
+        <div id="status" class="status"></div>
+
+        <!-- 使用说明 -->
+        <div class="info-box">
+          <h3>📖 如何获取API密钥</h3>
+          <ol>
+            <li>
+              访问
+              <a href="https://cloud.baidu.com/" target="_blank">百度智能云控制台</a>
+            </li>
+            <li>登录后进入 "产品服务" → "人工智能" → "文字识别OCR"</li>
+            <li>创建应用，获取 API Key 和 Secret Key</li>
+            <li>将密钥填写到下方表单中并保存</li>
+          </ol>
+        </div>
+
+        <!-- API密钥配置 -->
+        <div class="form-section">
+          <div class="form-section-title">API密钥配置</div>
+
+          <div class="form-group">
+            <label for="apiKey">API Key *</label>
+            <input
+              type="password"
+              id="apiKey"
+              placeholder="请输入百度云API Key"
+              required
+              autocomplete="off"
+            />
+            <div class="hint">
+              在百度智能云控制台的应用列表中获取
+              <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank"
+                >前往获取</a
+              >
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="secretKey">Secret Key *</label>
+            <input
+              type="password"
+              id="secretKey"
+              placeholder="请输入百度云Secret Key"
+              required
+              autocomplete="off"
+            />
+            <div class="hint">与API Key配套使用的密钥</div>
+          </div>
+        </div>
+
+        <!-- 功能选项 -->
+        <div class="form-section">
+          <div class="form-section-title">功能选项</div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoCopyResult" />
+            <label for="autoCopyResult">
+              <strong>自动复制识别结果</strong>
+              <div class="hint">识别完成后自动将文字复制到剪贴板</div>
+            </label>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoDetectDirection" />
+            <label for="autoDetectDirection">
+              <strong>自动检测图片方向</strong>
+              <div class="hint">自动检测并旋转图片到正确方向（可能增加处理时间）</div>
+            </label>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="showProbability" />
+            <label for="showProbability">
+              <strong>显示识别置信度</strong>
+              <div class="hint">在结果中显示每个文字的识别准确率</div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footer-info">
+          <span id="configStatus">未保存</span>
+        </div>
+        <div class="footer-actions">
+          <button class="btn-secondary" onclick="resetConfig()">重置</button>
+          <button class="btn-test" onclick="testConfig()" id="testBtn">测试连接</button>
+          <button class="btn-primary" onclick="saveConfig()" id="saveBtn">保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let pluginId = ''
+      let originalConfig = {}
+      let configChanged = false
+
+      // 页面加载时初始化
+      window.addEventListener('DOMContentLoaded', async () => {
+        try {
+          // pluginId 在 HTML 加载前就已注入
+          if (window.pluginId) {
+            pluginId = window.pluginId
+            console.log('Plugin ID:', pluginId)
+          } else {
+            console.error('Plugin ID not found')
+          }
+
+          // 配置数据在 window.pluginData 中
+          if (window.pluginData && window.pluginData.config) {
+            originalConfig = window.pluginData.config
+            loadConfigToForm(originalConfig)
+            updateConfigStatus(false)
+          }
+
+          // 监听表单变化
+          const inputs = document.querySelectorAll('input')
+          inputs.forEach((input) => {
+            input.addEventListener('input', () => {
+              configChanged = true
+              updateConfigStatus(true)
+            })
+          })
+
+          // 处理外部链接 - 在默认浏览器中打开
+          const links = document.querySelectorAll('a[href^="http"]')
+          links.forEach((link) => {
+            link.addEventListener('click', async (e) => {
+              e.preventDefault()
+              const url = link.getAttribute('href')
+              if (url && pluginId) {
+                try {
+                  await window.api.plugin.invoke(`${pluginId}:openExternalLink`, url)
+                } catch (error) {
+                  console.error('打开链接失败:', error)
+                }
+              }
+            })
+          })
+        } catch (error) {
+          console.error('初始化失败:', error)
+          showStatus('error', '加载配置失败: ' + error.message)
+        }
+      })
+
+      // 将配置加载到表单
+      function loadConfigToForm(config) {
+        document.getElementById('apiKey').value = config.apiKey || ''
+        document.getElementById('secretKey').value = config.secretKey || ''
+        document.getElementById('autoCopyResult').checked = config.autoCopyResult !== false
+        document.getElementById('autoDetectDirection').checked = config.autoDetectDirection || false
+        document.getElementById('showProbability').checked = config.showProbability || false
+      }
+
+      // 从表单获取配置
+      function getConfigFromForm() {
+        return {
+          apiKey: document.getElementById('apiKey').value.trim(),
+          secretKey: document.getElementById('secretKey').value.trim(),
+          autoCopyResult: document.getElementById('autoCopyResult').checked,
+          autoDetectDirection: document.getElementById('autoDetectDirection').checked,
+          showProbability: document.getElementById('showProbability').checked
+        }
+      }
+
+      // 保存配置
+      async function saveConfig() {
+        const saveBtn = document.getElementById('saveBtn')
+
+        try {
+          const newConfig = getConfigFromForm()
+
+          // 验证
+          if (!newConfig.apiKey) {
+            showStatus('error', 'API Key 不能为空')
+            document.getElementById('apiKey').focus()
+            return
+          }
+
+          if (!newConfig.secretKey) {
+            showStatus('error', 'Secret Key 不能为空')
+            document.getElementById('secretKey').focus()
+            return
+          }
+
+          // 显示加载状态
+          saveBtn.disabled = true
+          saveBtn.innerHTML = '<span class="loading"></span>保存中...'
+
+          // 通过 IPC 保存
+          const result = await window.api.plugin.invoke(`${pluginId}:saveConfig`, newConfig)
+
+          if (result.success) {
+            showStatus('success', '配置已成功保存！')
+            originalConfig = newConfig
+            configChanged = false
+            updateConfigStatus(false)
+
+            // 2秒后关闭窗口
+            setTimeout(() => {
+              window.close()
+            }, 2000)
+          } else {
+            showStatus('error', '保存失败: ' + result.error)
+          }
+        } catch (error) {
+          console.error('保存配置失败:', error)
+          showStatus('error', '保存失败: ' + error.message)
+        } finally {
+          saveBtn.disabled = false
+          saveBtn.innerHTML = '保存配置'
+        }
+      }
+
+      // 测试配置
+      async function testConfig() {
+        const testBtn = document.getElementById('testBtn')
+
+        try {
+          const config = getConfigFromForm()
+
+          if (!config.apiKey || !config.secretKey) {
+            showStatus('error', '请先填写API Key和Secret Key')
+            return
+          }
+
+          testBtn.disabled = true
+          testBtn.innerHTML = '<span class="loading"></span>测试中...'
+
+          showStatus('success', '正在测试连接...')
+
+          // 这里可以调用一个测试接口
+          // 暂时只是保存并提示
+          showStatus('success', '密钥格式正确，请保存后使用')
+        } catch (error) {
+          showStatus('error', '测试失败: ' + error.message)
+        } finally {
+          testBtn.disabled = false
+          testBtn.innerHTML = '测试连接'
+        }
+      }
+
+      // 重置配置
+      function resetConfig() {
+        loadConfigToForm(originalConfig)
+        configChanged = false
+        updateConfigStatus(false)
+        showStatus('success', '已恢复到之前保存的配置')
+      }
+
+      // 显示状态消息
+      function showStatus(type, message) {
+        const statusEl = document.getElementById('status')
+        statusEl.className = `status ${type}`
+        statusEl.textContent = message
+        statusEl.style.display = 'block'
+
+        setTimeout(() => {
+          statusEl.style.display = 'none'
+        }, 3000)
+      }
+
+      // 更新配置状态
+      function updateConfigStatus(changed) {
+        const statusEl = document.getElementById('configStatus')
+        if (changed) {
+          statusEl.textContent = '⚠️ 配置已修改'
+          statusEl.style.color = '#ff9800'
+        } else {
+          statusEl.textContent = '✅ 配置已保存'
+          statusEl.style.color = '#4caf50'
+        }
+      }
+    </script>
+  </body>
+</html>

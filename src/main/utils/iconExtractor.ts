@@ -55,15 +55,17 @@ async function convertIcoBufferToPngDataUrl(iconBuffer: Buffer): Promise<string 
 
 /**
  * IconsExtract 工具路径 (需要下载并放置在 resources 目录)
- * 在开发环境使用项目根目录的 resources，在生产环境使用 app.getPath('exe') 所在目录的 resources
+ * 在开发环境使用项目根目录的 resources，在生产环境使用 app.asar.unpacked
  */
 function getIconsExtractPath(): string {
   // 开发环境：使用项目根目录
   if (!app.isPackaged) {
     return join(app.getAppPath(), 'resources', 'tools', 'iconsext.exe')
   }
-  // 生产环境：使用打包后的 resources 目录
-  return join(process.resourcesPath, 'tools', 'iconsext.exe')
+  // 生产环境：使用 app.asar.unpacked 目录
+  // process.resourcesPath 指向 resources/ 目录
+  // app.asar.unpacked 在 resources/ 目录下
+  return join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'tools', 'iconsext.exe')
 }
 
 const ICONS_EXTRACT_PATH = getIconsExtractPath()

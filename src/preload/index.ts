@@ -218,7 +218,15 @@ const api = {
     // 重新加载插件
     reload: (pluginId: string) => ipcRenderer.invoke('plugin:reload', pluginId),
     // 获取插件详情
-    getDetails: (pluginId: string) => ipcRenderer.invoke('plugin:get-details', pluginId)
+    getDetails: (pluginId: string) => ipcRenderer.invoke('plugin:get-details', pluginId),
+    // 调用插件的 IPC 处理器
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    invoke: (channel: string, ...args: any[]) => {
+      // channel 格式: "pluginId:handlerName"
+      // 转换为: "plugin:pluginId:handlerName"
+      const fullChannel = `plugin:${channel}`
+      return ipcRenderer.invoke(fullChannel, ...args)
+    }
   }
 }
 

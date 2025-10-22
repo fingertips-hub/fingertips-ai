@@ -1,5 +1,6 @@
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron'
 import * as path from 'path'
+import { promises as fs } from 'fs'
 import type { PluginWindowOptions, PluginWindowInstance, PluginManifest } from '../types/plugin'
 import { getPluginDirectory } from './pluginLoader'
 
@@ -78,14 +79,32 @@ class PluginWindowManager {
           // 加载本地 HTML 文件
           const pluginDir = getPluginDirectory(manifest.id)
           const htmlPath = path.join(pluginDir, options.html)
-          const htmlUrl = `file://${htmlPath.replace(/\\/g, '/')}`
 
-          console.log(`Loading plugin window: ${htmlUrl}`)
-          window.loadFile(htmlPath).catch((error) => {
-            console.error(`Failed to load plugin window HTML:`, error)
-            this.closeWindow(windowId)
-            reject(new Error(`Failed to load HTML file: ${error.message}`))
-          })
+          console.log(`Loading plugin window: ${htmlPath}`)
+
+          // 读取 HTML 文件内容并注入插件数据
+          fs.readFile(htmlPath, 'utf-8')
+            .then((htmlContent) => {
+              // 在 <head> 中注入插件数据
+              const injectedScript = `
+                <script>
+                  window.pluginData = ${JSON.stringify(options.data || {})};
+                  window.pluginId = "${manifest.id}";
+                  window.windowId = "${windowId}";
+                </script>
+              `
+              // 在 </head> 之前插入脚本
+              const modifiedHtml = htmlContent.replace('</head>', `${injectedScript}\n  </head>`)
+
+              // 使用 data URL 加载修改后的 HTML
+              const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(modifiedHtml)}`
+              return window.loadURL(dataUrl)
+            })
+            .catch((error) => {
+              console.error(`Failed to load plugin window HTML:`, error)
+              this.closeWindow(windowId)
+              reject(new Error(`Failed to load HTML file: ${error.message}`))
+            })
         } else if (options.url) {
           // 加载远程 URL (需要 network 权限)
           console.log(`Loading plugin window URL: ${options.url}`)
@@ -139,15 +158,6 @@ class PluginWindowManager {
 
         // 窗口加载完成后显示
         window.webContents.once('did-finish-load', () => {
-          // 如果有数据，注入到窗口
-          if (options.data) {
-            window.webContents.executeJavaScript(`
-              window.pluginData = ${JSON.stringify(options.data)};
-              window.pluginId = "${manifest.id}";
-              window.windowId = "${windowId}";
-            `)
-          }
-
           window.show()
           console.log(`Plugin window created: ${windowId}`)
         })

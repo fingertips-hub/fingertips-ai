@@ -441,6 +441,8 @@ my-plugin/
   - `notification` - 显示系统通知
   - `clipboard` - 访问剪贴板
   - `dialog` - 显示系统对话框
+  - `window` - 创建和管理窗口
+  - `screenshot` - 调用系统截图工具
   - `ai:config` - 访问 AI 配置
   - `settings:read` - 读取应用设置
   - `settings:write` - 写入应用设置
@@ -863,6 +865,8 @@ interface PluginContext {
     clipboard: ClipboardAPI // 剪贴板 API
     fs: FileSystemAPI // 文件系统 API (受限)
     ipc: IPCAPI // IPC 通信 API
+    window: WindowAPI // 窗口管理 API
+    screenshot: ScreenshotAPI // 截图 API
   }
 
   // 配置管理
@@ -1698,7 +1702,238 @@ activate(context) {
 5. **数据传递**: 使用 `data` 参数传递初始数据，在窗口中通过 `window.pluginData` 访问
 6. **IPC 通信**: 使用插件的 IPC 处理器与窗口通信
 
-### 8. Config API
+### 8. Screenshot API
+
+调用系统截图工具并获取截图结果。
+
+**权限要求**: `screenshot`
+
+#### capture()
+
+调用系统截图工具,允许用户截图。
+
+**返回值**: `Promise<string>`
+
+- 如果用户完成截图,返回图片的 DataURL (base64 编码的 PNG 格式)
+- 如果用户取消截图,返回空字符串 `""`
+
+**DataURL 格式**: `data:image/png;base64,iVBORw0KG...`
+
+**示例**:
+
+```javascript
+// 基础用法
+async function takeScreenshot() {
+  const dataURL = await context.api.screenshot.capture()
+
+  if (dataURL) {
+    console.log('截图成功!')
+    // dataURL 可以直接用于 <img> 标签
+    // 或保存为文件
+  } else {
+    console.log('用户取消了截图')
+  }
+}
+```
+
+**保存截图到文件**:
+
+```javascript
+async function saveScreenshot() {
+  try {
+    // 调用截图 API
+    const dataURL = await context.api.screenshot.capture()
+
+    if (!dataURL) {
+      context.api.notification.show({
+        title: '截图',
+        body: '已取消截图'
+      })
+      return
+    }
+
+    // 转换 DataURL 为 Buffer
+    const base64Data = dataURL.replace(/^data:image\/png;base64,/, '')
+    const buffer = Buffer.from(base64Data, 'base64')
+
+    // 生成文件名
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `screenshot_${timestamp}.png`
+    const filePath = path.join(context.pluginDir, filename)
+
+    // 保存文件
+    await context.api.fs.writeFile(filePath, buffer)
+
+    // 显示成功通知
+    context.api.notification.show({
+      title: '截图成功',
+      body: `截图已保存到: ${filename}`
+    })
+
+    return filePath
+  } catch (error) {
+    console.error('截图失败:', error)
+    context.api.notification.show({
+      title: '截图失败',
+      body: error.message
+    })
+  }
+}
+```
+
+**在插件窗口中显示截图**:
+
+```javascript
+// index.js
+async function showScreenshotPreview() {
+  // 创建预览窗口
+  const window = await context.api.window.create({
+    title: '截图预览',
+    width: 800,
+    height: 600,
+    html: 'ui/preview.html'
+  })
+
+  // 执行截图
+  context.api.notification.show({
+    title: '截图',
+    body: '请选择要截图的区域...'
+  })
+
+  const dataURL = await context.api.screenshot.capture()
+
+  if (dataURL) {
+    // 发送截图数据到窗口
+    window.send('screenshot-data', { dataURL })
+  } else {
+    window.close()
+  }
+}
+```
+
+**ui/preview.html**:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>截图预览</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #f0f0f0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      .preview {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-width: 90%;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      .actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+      .btn-secondary {
+        background: #e0e0e0;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview">
+      <img id="screenshot" alt="截图预览" />
+      <div class="actions">
+        <button class="btn-primary" onclick="saveImage()">保存</button>
+        <button class="btn-secondary" onclick="window.close()">关闭</button>
+      </div>
+    </div>
+
+    <script>
+      let currentDataURL = ''
+
+      // 监听截图数据
+      window.api.on('screenshot-data', (data) => {
+        currentDataURL = data.dataURL
+        document.getElementById('screenshot').src = currentDataURL
+      })
+
+      // 保存图片
+      async function saveImage() {
+        // 触发下载
+        const a = document.createElement('a')
+        a.href = currentDataURL
+        a.download = `screenshot_${Date.now()}.png`
+        a.click()
+      }
+    </script>
+  </body>
+</html>
+```
+
+**错误处理**:
+
+```javascript
+try {
+  const dataURL = await context.api.screenshot.capture()
+
+  if (!dataURL) {
+    console.log('用户取消了截图')
+    return { success: false, cancelled: true }
+  }
+
+  // 处理截图数据
+  return { success: true, dataURL }
+} catch (error) {
+  if (error.message.includes('permission')) {
+    console.error('缺少截图权限,请在 manifest.json 中添加 screenshot 权限')
+    context.api.notification.show({
+      title: '权限不足',
+      body: '此功能需要截图权限'
+    })
+  } else {
+    console.error('截图失败:', error)
+  }
+  return { success: false, error: error.message }
+}
+```
+
+**注意事项**:
+
+1. **平台支持**: 目前仅支持 Windows 平台 (使用 ScreenCapture.exe)
+2. **用户交互**: 截图过程需要用户选择区域,可能被取消
+3. **数据格式**: 返回的是 PNG 格式的 DataURL,以 `data:image/png;base64,` 开头
+4. **文件保存**: 如需保存文件,还需要 `fs:write` 权限
+5. **异步操作**: `capture()` 是异步方法,必须使用 `await` 或 `.then()`
+6. **内存占用**: DataURL 字符串可能很大,注意及时处理和释放
+
+**完整示例插件**:
+
+参考 `plugins/screenshot-viewer/` 插件,它展示了截图功能的完整用法。
+
+### 9. Config API
 
 插件配置管理。
 
@@ -1805,6 +2040,7 @@ context.config.onChange('language', (newValue, oldValue) => {
 | `clipboard`      | 访问剪贴板      | 中       | 剪贴板历史、文本处理 |
 | `dialog`         | 显示系统对话框  | 低       | 文件选择、用户确认   |
 | `window`         | 创建和管理窗口  | 中       | 自定义界面、配置面板 |
+| `screenshot`     | 调用截图工具    | 中       | 截图功能、图片处理   |
 | `ai:config`      | 访问 AI 配置    | 中       | AI 功能扩展          |
 | `settings:read`  | 读取应用设置    | 低       | 读取配置信息         |
 | `settings:write` | 写入应用设置    | 中       | 修改应用配置         |
@@ -3996,10 +4232,15 @@ async execute(params) {
 - [插件系统开发方案](./PLUGIN_SYSTEM_DEVELOPMENT_PLAN.md)
 - [插件系统测试指南](./PLUGIN_SYSTEM_TEST_GUIDE.md)
 - [快速开始指南](./PLUGIN_QUICK_START.md)
+- [截图 API 使用指南](./SCREENSHOT_API_GUIDE.md)
 
 ### 示例插件
 
 - [Hello World](../plugins/hello-world/) - 基础示例
+- [Screenshot Viewer](../plugins/screenshot-viewer/) - 截图功能示例
+- [Vue Plugin Demo](../plugins/vue-plugin-demo/) - Vue 3 界面开发示例
+- [Window Demo](../plugins/window-demo/) - 窗口管理示例
+- [Text Processor](../plugins/text-processor/) - 文本处理示例
 
 ### 外部资源
 
@@ -4038,10 +4279,12 @@ async execute(params) {
 
 - ✅ 初始版本发布
 - ✅ 完整的插件系统
-- ✅ 6 个核心 API
+- ✅ 9 个核心 API (Settings, Dialog, Notification, Clipboard, FileSystem, IPC, Window, Screenshot, Config)
 - ✅ 权限系统
 - ✅ 配置管理
 - ✅ 示例插件
+- ✅ 支持截图功能 (Screenshot API)
+- ✅ 支持 Vue 3 开发插件界面
 
 ---
 

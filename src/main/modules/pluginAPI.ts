@@ -1,5 +1,6 @@
 import { dialog, clipboard, Notification, ipcMain } from 'electron'
 import * as fs from 'fs/promises'
+import { accessSync, constants as fsConstants } from 'fs'
 import * as path from 'path'
 import { execFile } from 'child_process'
 import type {
@@ -20,6 +21,27 @@ import { pluginWindowManager } from './pluginWindowManager'
  * 插件 API 提供者
  * 为插件提供受限的 API 访问
  */
+
+/**
+ * 获取 ScreenCapture.exe 工具路径
+ * 在开发环境使用项目根目录的 resources，在生产环境使用 app.asar.unpacked
+ */
+function getScreenCaptureToolPath(): string {
+  // 开发环境：使用项目根目录
+  if (!app.isPackaged) {
+    return path.join(app.getAppPath(), 'resources', 'tools', 'ScreenCapture.exe')
+  }
+  // 生产环境：使用 app.asar.unpacked 目录
+  // process.resourcesPath 指向 resources/ 目录
+  // app.asar.unpacked 在 resources/ 目录下
+  return path.join(
+    process.resourcesPath,
+    'app.asar.unpacked',
+    'resources',
+    'tools',
+    'ScreenCapture.exe'
+  )
+}
 
 /**
  * 检查插件是否有指定权限
@@ -297,13 +319,21 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
         throw new Error(`Plugin ${manifest.id} does not have permission: screenshot`)
       }
 
-      return new Promise<string>((resolve) => {
+      return new Promise<string>((resolve, reject) => {
         // 获取 ScreenCapture.exe 的路径
-        // 在开发环境下使用项目根目录的 resources，在打包后使用 process.resourcesPath
-        const isDev = !app.isPackaged
-        const screenshotToolPath = isDev
-          ? path.join(app.getAppPath(), 'resources', 'tools', 'ScreenCapture.exe')
-          : path.join(process.resourcesPath, 'tools', 'ScreenCapture.exe')
+        const screenshotToolPath = getScreenCaptureToolPath()
+
+        console.log('截图工具路径:', screenshotToolPath)
+
+        // 检查文件是否存在
+        try {
+          accessSync(screenshotToolPath, fsConstants.F_OK)
+        } catch (err) {
+          const errorMsg = `截图工具不存在: ${screenshotToolPath}`
+          console.error(errorMsg, err)
+          reject(new Error(errorMsg))
+          return
+        }
 
         const screenProcess = execFile(screenshotToolPath)
 
@@ -312,16 +342,24 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
             // 进程退出，尝试从剪贴板读取图片
             const image = clipboard.readImage()
             const dataURL = image.isEmpty() ? '' : image.toDataURL()
+
+            if (dataURL) {
+              console.log('截图成功，数据大小:', Math.round(dataURL.length / 1024), 'KB')
+            } else {
+              console.log('截图为空（用户可能取消了）')
+            }
+
             resolve(dataURL)
           } else {
             // 用户取消截图
+            console.log('截图进程退出，code:', code)
             resolve('')
           }
         })
 
         screenProcess.on('error', (err) => {
-          console.error('Screenshot error:', err)
-          resolve('')
+          console.error('截图进程错误:', err)
+          reject(new Error(`截图工具启动失败: ${err.message}`))
         })
       })
     }

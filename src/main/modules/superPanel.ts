@@ -59,7 +59,7 @@ export function createSuperPanelWindow(): BrowserWindow {
 
   // 🔧 只在开发环境且需要时打开 DevTools（注释掉以提升性能）
   // if (is.dev) {
-  //   window.webContents.openDevTools({ mode: 'detach' })
+  window.webContents.openDevTools({ mode: 'detach' })
   // }
 
   // 🚀 性能优化：监听 ready-to-show 事件，确保窗口内容准备好

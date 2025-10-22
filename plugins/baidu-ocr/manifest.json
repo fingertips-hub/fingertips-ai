@@ -1,0 +1,31 @@
+{
+  "id": "baidu-ocr",
+  "name": "百度云OCR识别",
+  "version": "1.0.0",
+  "description": "截图后使用百度云OCR识别图片中的文字，支持高精度文字识别",
+  "author": "Fingertips AI",
+  "icon": "mdi:text-recognition",
+  "keywords": ["OCR", "文字识别", "截图", "百度云"],
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["screenshot", "window", "notification", "clipboard", "dialog"],
+
+  "config": {
+    "defaults": {
+      "apiKey": "",
+      "secretKey": "",
+      "autoDetectDirection": false,
+      "autoCopyResult": true,
+      "showProbability": false
+    }
+  },
+
+  "ui": {
+    "hasPanel": false
+  }
+}
