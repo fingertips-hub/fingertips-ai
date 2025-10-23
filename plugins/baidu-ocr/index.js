@@ -77,6 +77,17 @@ module.exports = {
         return { success: false, error: error.message }
       }
     })
+
+    // 注册打开配置窗口处理器
+    context.ipc.handle('openConfig', async () => {
+      try {
+        await openConfigWindow()
+        return { success: true }
+      } catch (error) {
+        console.error('打开配置窗口失败:', error)
+        return { success: false, error: error.message }
+      }
+    })
   },
 
   /**

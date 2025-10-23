@@ -25,6 +25,7 @@ import {
 } from './modules/cmdGeneratorHandlers'
 import { pluginManager } from './modules/pluginManager'
 import { setupPluginHandlers, cleanupPluginHandlers } from './modules/pluginHandlers'
+import { initializeAutoUpdater } from './modules/autoUpdater'
 
 // =============================================================================
 // 单实例锁定 - Single Instance Lock
@@ -204,6 +205,10 @@ app.whenReady().then(() => {
   initializeDefaultHotkey().catch((error) => {
     console.error('Failed to initialize default hotkey:', error)
   })
+
+  // Initialize Auto Updater (GitHub Releases)
+  // 🚀 启动自动更新系统，延迟2秒后自动检查更新
+  initializeAutoUpdater()
 
   // Optional: createWindow() for main window if needed
   // createWindow()

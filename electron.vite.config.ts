@@ -17,7 +17,8 @@ export default defineConfig({
           index: resolve(__dirname, 'src/renderer/index.html'),
           settings: resolve(__dirname, 'src/renderer/settings.html'),
           'super-panel': resolve(__dirname, 'src/renderer/super-panel.html'),
-          'ai-shortcut-runner': resolve(__dirname, 'src/renderer/ai-shortcut-runner.html')
+          'ai-shortcut-runner': resolve(__dirname, 'src/renderer/ai-shortcut-runner.html'),
+          'update-progress': resolve(__dirname, 'src/renderer/update-progress.html')
         }
       }
     },

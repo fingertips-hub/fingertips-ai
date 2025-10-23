@@ -291,6 +291,7 @@
         <div>总字数: <span class="badge" id="charCount">0</span></div>
       </div>
       <div class="toolbar-actions">
+        <button class="btn-secondary" onclick="openConfigWindow()">⚙️ 配置</button>
         <button class="btn-secondary" onclick="window.close()">关闭</button>
         <button class="btn-primary" onclick="copyToClipboard()">📋 复制全部文字</button>
       </div>
@@ -438,6 +439,23 @@
           document.getElementById('textTab').classList.add('active')
         } else if (tabName === 'detail') {
           document.getElementById('detailTab').classList.add('active')
+        }
+      }
+
+      // 打开配置窗口
+      async function openConfigWindow() {
+        try {
+          if (!pluginId) {
+            console.error('Plugin ID not found')
+            alert('无法打开配置窗口:插件ID未找到')
+            return
+          }
+
+          // 调用插件的打开配置窗口功能
+          await window.api.plugin.invoke(`${pluginId}:openConfig`)
+        } catch (error) {
+          console.error('打开配置窗口失败:', error)
+          alert('打开配置窗口失败: ' + error.message)
         }
       }
 

@@ -66,6 +66,10 @@ class PluginWindowManager {
         // 创建窗口
         const window = new BrowserWindow(windowOptions)
 
+        // 隐藏菜单栏
+        window.setMenuBarVisibility(false)
+        window.setMenu(null)
+
         // 存储窗口信息
         this.windows.set(windowId, {
           window,
