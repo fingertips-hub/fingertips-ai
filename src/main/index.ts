@@ -293,10 +293,6 @@ app.on('before-quit', () => {
   } catch (error) {
     console.error('[Cleanup] ✗ Error cleaning up Plugin System:', error)
   }
-
-  console.log('===============================================')
-  console.log('Application cleanup completed')
-  console.log('===============================================')
 })
 
 // In this file you can include the rest of your app's specific main process

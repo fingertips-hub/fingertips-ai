@@ -13,12 +13,13 @@ let updateWindow: BrowserWindow | null = null
 // Update window configuration
 const UPDATE_WINDOW_CONFIG = {
   width: 500,
-  height: 400,
+  height: 550,
   resizable: false,
   minimizable: false,
   maximizable: false,
   alwaysOnTop: true,
-  center: true
+  center: true,
+  frame: false
 }
 
 /**

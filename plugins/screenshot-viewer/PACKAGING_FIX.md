@@ -3,6 +3,7 @@
 ## 🐛 问题描述
 
 打包后使用截图插件，每次都打开截图框但没有截图，日志显示：
+
 ```
 捕获的文本长度: 0
 Plugin screenshot-viewer executed successfully
@@ -13,11 +14,13 @@ Plugin screenshot-viewer executed successfully
 ### 问题：打包后文件路径不正确
 
 **文件实际位置**（打包后）：
+
 ```
 dist/win-unpacked/resources/app.asar.unpacked/resources/tools/ScreenCapture.exe
 ```
 
 **代码中的路径**（错误）：
+
 ```javascript
 // ❌ 原来的代码
 path.join(process.resourcesPath, 'tools', 'ScreenCapture.exe')
@@ -25,6 +28,7 @@ path.join(process.resourcesPath, 'tools', 'ScreenCapture.exe')
 ```
 
 **结果**：找不到 `ScreenCapture.exe`，导致：
+
 1. 截图工具无法启动
 2. 没有错误提示（被静默处理）
 3. 返回空字符串
@@ -32,6 +36,7 @@ path.join(process.resourcesPath, 'tools', 'ScreenCapture.exe')
 ### 为什么会这样？
 
 electron-builder 配置中有：
+
 ```yaml
 asarUnpack:
   - resources/**
@@ -96,10 +101,10 @@ if (dataURL) {
 
 ## 📊 对比
 
-| 场景 | 原路径 | 新路径 | 结果 |
-|------|--------|--------|------|
-| 开发环境 | `app.getAppPath()/resources/tools/` | `app.getAppPath()/resources/tools/` | ✅ 相同 |
-| 生产环境 | `process.resourcesPath/tools/` ❌ | `process.resourcesPath/app.asar.unpacked/resources/tools/` ✅ | ✅ 修复 |
+| 场景     | 原路径                              | 新路径                                                        | 结果    |
+| -------- | ----------------------------------- | ------------------------------------------------------------- | ------- |
+| 开发环境 | `app.getAppPath()/resources/tools/` | `app.getAppPath()/resources/tools/`                           | ✅ 相同 |
+| 生产环境 | `process.resourcesPath/tools/` ❌   | `process.resourcesPath/app.asar.unpacked/resources/tools/` ✅ | ✅ 修复 |
 
 ## 🧪 验证步骤
 
@@ -123,12 +128,14 @@ npm run build
 ### 4. 检查控制台输出
 
 **成功的日志**：
+
 ```
 截图工具路径: D:\...\resources\app.asar.unpacked\resources\tools\ScreenCapture.exe
 截图成功，数据大小: 245 KB
 ```
 
 **失败的日志（旧版本）**：
+
 ```
 截图工具不存在: D:\...\resources\tools\ScreenCapture.exe
 ```
@@ -141,10 +148,10 @@ npm run build
 
 ### 1. 打包路径的差异
 
-| 环境 | `app.getAppPath()` | `process.resourcesPath` |
-|------|-------------------|-------------------------|
-| 开发 | 项目根目录 | - |
-| 生产 | `resources/app.asar` | `resources/` |
+| 环境 | `app.getAppPath()`   | `process.resourcesPath` |
+| ---- | -------------------- | ----------------------- |
+| 开发 | 项目根目录           | -                       |
+| 生产 | `resources/app.asar` | `resources/`            |
 
 ### 2. asarUnpack 的行为
 
@@ -186,6 +193,7 @@ try {
 ## 🔄 相关问题
 
 这个问题也可能影响其他使用外部工具的功能：
+
 - ✅ `iconExtractor.ts` - 已经使用正确的路径
 - ✅ `pluginAPI.ts` - 本次修复
 
@@ -200,6 +208,7 @@ try {
 ## 🎉 预期结果
 
 修复后，打包的应用应该：
+
 1. ✅ 正确找到 `ScreenCapture.exe`
 2. ✅ 成功启动截图工具
 3. ✅ 截图后正确显示在查看器中
@@ -211,4 +220,3 @@ try {
 **修复时间**：2024-10-22
 **影响范围**：打包后的生产环境
 **优先级**：🔴 高（核心功能）
-

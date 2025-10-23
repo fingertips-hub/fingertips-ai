@@ -150,9 +150,9 @@ function formatSpeed(bytesPerSecond: number): string {
 }
 
 // IPC 监听器
-let updateInfoListener: ((event: any, info: UpdateInfo) => void) | null = null
-let updateProgressListener: ((event: any, progress: ProgressInfo) => void) | null = null
-let updateStatusListener: ((event: any, statusInfo: StatusInfo) => void) | null = null
+let updateInfoListener: ((event: unknown, info: UpdateInfo) => void) | null = null
+let updateProgressListener: ((event: unknown, progress: ProgressInfo) => void) | null = null
+let updateStatusListener: ((event: unknown, statusInfo: StatusInfo) => void) | null = null
 
 // 生命周期钩子
 onMounted(() => {
@@ -202,138 +202,188 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* 🔧 修复内容裁切：改用 flex-start，让内容从顶部开始排列 */
+  justify-content: flex-start;
+  /* 🔧 优化 padding：上 1.5rem, 左右 2rem, 下 2.5rem（增加底部间距） */
+  padding: 1.5rem 2rem 2.5rem 2rem;
+  /* 🎨 专业商务风格：柔和的浅灰色渐变，稳重可靠 */
+  background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* 修复滚动条问题：确保 padding 包含在高度内 */
+  box-sizing: border-box;
+  /* 🔧 改用 auto 允许必要时滚动，但隐藏滚动条 */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 🔧 隐藏滚动条但保持滚动功能 */
+.update-progress-container::-webkit-scrollbar {
+  display: none;
+}
+
+.update-progress-container {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 /* 头部 */
 .header {
-  text-align: center;
-  margin-bottom: 2rem;
+  /* 🔧 使用 flex 布局确保所有子元素居中 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  margin-top: 1rem;
+  flex-shrink: 0;
 }
 
 .icon-container {
-  display: inline-block;
+  /* 🔧 修复图标居中：使用 inline-flex 而不是两个冲突的 display */
+  display: inline-flex;
   width: 64px;
   height: 64px;
-  background: rgba(255, 255, 255, 0.2);
+  /* 🎨 现代设计：纯白色背景 + 精致阴影 */
+  background: white;
   border-radius: 50%;
-  display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.1),
+    0 0 0 4px rgba(255, 255, 255, 0.2);
 }
 
 .update-icon {
   width: 36px;
   height: 36px;
-  color: white;
+  /* 🎨 渐变色图标，呼应背景 */
+  color: #667eea;
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 1.625rem;
+  font-weight: 700;
   color: white;
   margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.5px;
 }
 
 /* 版本信息 */
 .version-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
+  gap: 1.25rem;
+  /* 🎨 现代设计：纯白色背景 + 玻璃质感 */
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
   padding: 1rem 1.5rem;
-  border-radius: 12px;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  /* 🎨 精致阴影：层次感 */
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
 }
 
 .version-item {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.375rem;
 }
 
 .version-label {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.6875rem;
+  color: #9ca3af;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  font-weight: 600;
 }
 
 .version-value {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: white;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .version-value.highlight {
-  color: #ffd700;
+  /* 🎨 品牌色高亮：渐变文字效果 */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
 }
 
 .version-arrow {
   font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #d1d5db;
+  font-weight: 300;
 }
 
 /* 状态信息 */
 .status-container {
   width: 100%;
   max-width: 400px;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
 }
 
 .status-message {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: 0.875rem;
+  padding: 1rem 1.25rem;
+  /* 🎨 现代设计：白色背景 + 柔和阴影 */
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .status-text {
   font-size: 0.9375rem;
-  color: white;
-  font-weight: 500;
+  color: #374151;
+  font-weight: 600;
 }
 
 .loading-spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
 .success-icon,
 .error-icon {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .success-icon {
-  background: #10b981;
+  /* 🎨 现代渐变：绿色系 */
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
 }
 
 .error-icon {
-  background: #ef4444;
+  /* 🎨 现代渐变：红色系 */
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: white;
 }
 
@@ -341,26 +391,31 @@ onUnmounted(() => {
 .progress-container {
   width: 100%;
   max-width: 400px;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
 }
 
 .progress-bar-bg {
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 100px;
   overflow: hidden;
-  margin-bottom: 0.75rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.875rem;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(255, 255, 255, 0.5);
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  /* 🎨 主题蓝渐变：专业稳重的蓝色系 */
+  background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
+  border-radius: 100px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
 }
 
 .progress-bar-shine {
@@ -382,45 +437,57 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.625rem;
 }
 
 .progress-percent {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .progress-details {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
 }
 
 .progress-speed {
   display: flex;
   justify-content: space-between;
   font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
 
 /* 底部 */
 .footer {
   text-align: center;
-  margin-top: 1rem;
+  /* 🔧 使用固定的 margin 而不是 auto，确保布局稳定 */
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .footer-text {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   margin: 0;
+  font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .footer-text.error {
+  /* 🎨 错误提示：亮红色 */
   color: #fca5a5;
+  font-weight: 600;
 }
 
 .footer-text.success {
+  /* 🎨 成功提示：亮绿色 */
   color: #86efac;
+  font-weight: 600;
 }
 
 /* 动画 */
@@ -434,11 +501,15 @@ onUnmounted(() => {
   0%,
   100% {
     transform: scale(1);
-    opacity: 1;
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.1),
+      0 0 0 4px rgba(255, 255, 255, 0.2);
   }
   50% {
-    transform: scale(1.05);
-    opacity: 0.8;
+    transform: scale(1.08);
+    box-shadow:
+      0 6px 28px rgba(0, 0, 0, 0.15),
+      0 0 0 6px rgba(255, 255, 255, 0.3);
   }
 }
 

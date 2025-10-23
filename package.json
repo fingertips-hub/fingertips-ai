@@ -1,9 +1,9 @@
 {
   "name": "fingertips-ai",
   "version": "1.0.0",
-  "description": "An Electron application with Vue and TypeScript",
+  "description": "Fingertips AI",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": "Fingertips Hub",
   "homepage": "https://github.com/fingertips-hub/fingertips-ai",
   "repository": {
     "type": "git",
