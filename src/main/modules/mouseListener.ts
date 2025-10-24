@@ -209,13 +209,10 @@ const KEYCODE_TO_UIOHOOK_KEY: Record<number, number> = {
  */
 function suppressHotkeyEvent(keycode: number): void {
   try {
-    console.log('[Suppress] Suppressing hotkey event for keycode:', keycode)
-
     // 1. 先释放触发键本身（例如 Q 键）
     const triggerKey = KEYCODE_TO_UIOHOOK_KEY[keycode]
     if (triggerKey) {
       uIOhook.keyToggle(triggerKey, 'up')
-      console.log('[Suppress] Released trigger key:', keycode)
     }
 
     // 2. 释放所有当前按下的修饰键（例如 Alt）
@@ -240,13 +237,10 @@ function suppressHotkeyEvent(keycode: number): void {
 
       if (keyToRelease) {
         uIOhook.keyToggle(keyToRelease, 'up')
-        console.log('[Suppress] Released modifier:', modifier)
       }
     })
-
-    console.log('[Suppress] ✓ Hotkey event suppressed successfully')
   } catch (error) {
-    console.error('[Suppress] ✗ Failed to suppress hotkey event:', error)
+    console.error('[Suppress] Failed to suppress hotkey event:', error)
   }
 }
 
@@ -395,29 +389,26 @@ function handleButtonDown(button: number, x: number, y: number): void {
 
   // 🔑 关键优化：在按键的瞬间就立即尝试捕获选中文本
   // 这时选中状态通常还没有丢失（取决于鼠标位置）
-  console.log('[MouseListener] 立即尝试捕获选中文本（在按下瞬间）...')
-
   // 🎯 使用立即执行的异步函数，避免阻塞
   ;(async () => {
     try {
       // 清空旧的缓存，准备捕获新内容
       capturedTextOnPress = ''
       capturedTextOnPress = await captureSelectedText()
-      console.log('[MouseListener] 按下时捕获的文本长度:', capturedTextOnPress.length)
+      // 只在捕获成功时才输出日志
       if (capturedTextOnPress.length > 0) {
-        console.log('[MouseListener] 捕获成功:', capturedTextOnPress.substring(0, 50))
+        console.log('[MouseListener] 已捕获文本:', capturedTextOnPress.substring(0, 50))
       }
-    } catch (err) {
-      console.error('[MouseListener] 捕获失败:', err)
+    } catch {
+      // 捕获失败时静默处理
       capturedTextOnPress = ''
     }
   })()
 
-  // 设置定时器,达到阈值后显示面板
+  // 设置定时器,达到阈值后立即显示面板
   longPressTimer = setTimeout(() => {
     // 检查是否仍在按下状态
     if (middleButtonPressTime !== null && middleButtonPressPosition !== null) {
-      console.log('[MouseListener] Long press threshold reached, showing Super Panel')
       showSuperPanelAtMouse()
       hasShownPanel = true
     }
@@ -509,8 +500,6 @@ export function setupGlobalMouseListener(): void {
     // 🔑 优先检测 AI 快捷指令的快捷键
     const shortcutInfo = checkShortcutHotkeyTriggered(event.keycode, activeModifiers)
     if (shortcutInfo) {
-      console.log(`[MouseListener] AI Shortcut hotkey detected: ${shortcutInfo.name}`)
-
       // 🚫 立即抑制快捷键事件，防止穿透到底层应用
       suppressHotkeyEvent(event.keycode)
 
@@ -524,29 +513,32 @@ export function setupGlobalMouseListener(): void {
     // 🔑 检测 Super Panel 快捷键触发（例如 Alt+Q）
     if (currentTriggerKey !== null && event.keycode === currentTriggerKey) {
       if (checkModifiersMatch()) {
-        console.log(`Keyboard trigger detected: ${currentTrigger}`)
-        console.log('[MouseListener] 快速捕获选中文本并显示 Super Panel...')
-
-        // 🚫 立即抑制快捷键事件，防止穿透到底层应用
-        suppressHotkeyEvent(event.keycode)
-
-        // 🚀 性能优化：快速捕获后立即显示
+        // 🚀🚀 极速优化：快速捕获 + 最小延迟显示
         ;(async () => {
           try {
-            // 清空旧的缓存，准备捕获新内容
+            // 1️⃣ 立即开始捕获选中文本（此时选中状态还在）
             capturedTextOnPress = ''
-            capturedTextOnPress = await captureSelectedText()
-            console.log('[MouseListener] 捕获完成，文本长度:', capturedTextOnPress.length)
+            const capturePromise = captureSelectedText()
+
+            // 2️⃣ 延迟 25ms 显示面板（等待 Ctrl+C 完成）
+            // 这是保证文本捕获成功的最小延迟
+            // 25ms 对用户来说仍然是"即时"的（< 100ms 阈值）
+            setTimeout(() => {
+              showSuperPanelAtMouse()
+            }, 25)
+
+            // 3️⃣ 延迟 30ms 抑制事件（在显示面板后）
+            setTimeout(() => {
+              suppressHotkeyEvent(event.keycode)
+            }, 30)
+
+            // 4️⃣ 在后台等待捕获完成
+            capturedTextOnPress = await capturePromise
             if (capturedTextOnPress.length > 0) {
-              console.log('[MouseListener] 捕获成功:', capturedTextOnPress.substring(0, 50))
+              console.log('[MouseListener] 已捕获文本:', capturedTextOnPress.substring(0, 50))
             }
-          } catch (err) {
-            console.error('[MouseListener] 捕获失败:', err)
+          } catch {
             capturedTextOnPress = ''
-          } finally {
-            // 无论捕获成功还是失败，都立即显示 Super Panel
-            console.log('[MouseListener] 显示 Super Panel')
-            showSuperPanelAtMouse()
           }
         })()
       }
