@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -11,7 +11,12 @@ import {
   preRenderSuperPanelWindow
 } from './modules/superPanel'
 import { showSettingsWindow } from './modules/Settings'
-import { setupGlobalMouseListener, stopGlobalMouseListener } from './modules/mouseListener'
+import {
+  setupGlobalMouseListener,
+  stopGlobalMouseListener,
+  restartGlobalMouseListener,
+  clearModifierStates
+} from './modules/mouseListener'
 import { setupSuperPanelHandlers, cleanupSuperPanelHandlers } from './modules/superPanelHandlers'
 import {
   setupSettingsHandlers,
@@ -228,6 +233,63 @@ app.whenReady().then(() => {
   ipcMain.on('show-settings', () => {
     showSettingsWindow()
   })
+
+  // =============================================================================
+  // 系统锁定/解锁事件监听 - System Lock/Unlock Event Listeners
+  // =============================================================================
+  // 🔑 关键修复：监听系统锁定/解锁事件，在解锁后重启 uIOhook
+  // 这可以解决 Win+L 锁屏后快捷键失效的问题
+
+  // 监听系统锁定事件
+  powerMonitor.on('lock-screen', () => {
+    console.log('===============================================')
+    console.log('🔒 System locked, cleaning up mouse listener state...')
+    console.log('===============================================')
+
+    // 清除修饰键状态，避免锁定时的按键状态残留
+    try {
+      clearModifierStates()
+      console.log('[Lock] ✓ Modifier states cleared')
+    } catch (error) {
+      console.error('[Lock] ✗ Error clearing modifier states:', error)
+    }
+  })
+
+  // 监听系统解锁事件
+  powerMonitor.on('unlock-screen', () => {
+    console.log('===============================================')
+    console.log('🔓 System unlocked, restarting mouse listener...')
+    console.log('===============================================')
+
+    // 延迟重启，给系统一些时间完全恢复
+    setTimeout(() => {
+      try {
+        restartGlobalMouseListener()
+        console.log('[Unlock] ✓ Mouse listener restarted successfully')
+      } catch (error) {
+        console.error('[Unlock] ✗ Error restarting mouse listener:', error)
+      }
+    }, 500)
+  })
+
+  // 监听系统恢复事件（从睡眠/休眠恢复）
+  powerMonitor.on('resume', () => {
+    console.log('===============================================')
+    console.log('⚡ System resumed from suspend, restarting mouse listener...')
+    console.log('===============================================')
+
+    // 延迟重启，给系统一些时间完全恢复
+    setTimeout(() => {
+      try {
+        restartGlobalMouseListener()
+        console.log('[Resume] ✓ Mouse listener restarted successfully')
+      } catch (error) {
+        console.error('[Resume] ✗ Error restarting mouse listener:', error)
+      }
+    }, 1000)
+  })
+
+  console.log('[PowerMonitor] ✓ System event listeners registered')
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

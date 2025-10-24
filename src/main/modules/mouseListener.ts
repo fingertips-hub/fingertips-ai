@@ -1,4 +1,4 @@
-import { uIOhook, UiohookMouseEvent, UiohookKeyboardEvent } from 'uiohook-napi'
+import { uIOhook, UiohookMouseEvent, UiohookKeyboardEvent, UiohookKey } from 'uiohook-napi'
 import {
   showSuperPanelAtMouse,
   hideSuperPanel,
@@ -20,6 +20,10 @@ let longPressTimer: NodeJS.Timeout | null = null
 let isListening = false
 let hasShownPanel = false // 标记是否已经显示了面板
 let capturedTextOnPress = '' // 在按键时立即捕获的文本
+
+// Health check state
+let lastEventTime = Date.now() // 最后一次收到事件的时间
+let healthCheckInterval: NodeJS.Timeout | null = null
 
 // Configuration
 const LONG_PRESS_THRESHOLD = 300 // milliseconds - 长按阈值
@@ -63,12 +67,187 @@ const KEY_CODE_TO_MODIFIER: Record<number, string> = {
  * 键盘按键名称到 keycode 的映射（常用键）
  */
 const KEY_NAME_TO_CODE: Record<string, number> = {
+  // 字母键
   Q: 16,
   W: 17,
   E: 18,
   R: 19,
   T: 20,
-  Space: 57
+  Y: 21,
+  U: 22,
+  I: 23,
+  O: 24,
+  P: 25,
+  A: 30,
+  S: 31,
+  D: 32,
+  F: 33,
+  G: 34,
+  H: 35,
+  J: 36,
+  K: 37,
+  L: 38,
+  Z: 44,
+  X: 45,
+  C: 46,
+  V: 47,
+  B: 48,
+  N: 49,
+  M: 50,
+  // 数字键
+  '1': 2,
+  '2': 3,
+  '3': 4,
+  '4': 5,
+  '5': 6,
+  '6': 7,
+  '7': 8,
+  '8': 9,
+  '9': 10,
+  '0': 11,
+  // 特殊字符键
+  '`': 41, // 反引号（Grave/Backquote）
+  '-': 12, // 减号/下划线
+  '=': 13, // 等号/加号
+  '[': 26, // 左方括号/左大括号
+  ']': 27, // 右方括号/右大括号
+  '\\': 43, // 反斜杠/竖线
+  ';': 39, // 分号/冒号
+  "'": 40, // 单引号/双引号
+  ',': 51, // 逗号/小于号
+  '.': 52, // 句号/大于号
+  '/': 53, // 斜杠/问号
+  // 功能键
+  Space: 57,
+  Enter: 28,
+  Esc: 1,
+  Backspace: 14,
+  Tab: 15
+}
+
+/**
+ * keycode 到 UiohookKey 的映射（用于事件抑制）
+ */
+const KEYCODE_TO_UIOHOOK_KEY: Record<number, number> = {
+  // 修饰键
+  29: UiohookKey.Ctrl, // Left Control
+  3613: UiohookKey.Ctrl, // Right Control (使用相同的 Ctrl 键)
+  56: UiohookKey.Alt, // Left Alt
+  3640: UiohookKey.Alt, // Right Alt (使用相同的 Alt 键)
+  42: UiohookKey.Shift, // Left Shift
+  54: UiohookKey.Shift, // Right Shift (使用相同的 Shift 键)
+  3675: UiohookKey.Meta, // Left Win/Command
+  3676: UiohookKey.Meta, // Right Win/Command (使用相同的 Meta 键)
+  // 字母键
+  16: UiohookKey.Q,
+  17: UiohookKey.W,
+  18: UiohookKey.E,
+  19: UiohookKey.R,
+  20: UiohookKey.T,
+  21: UiohookKey.Y,
+  22: UiohookKey.U,
+  23: UiohookKey.I,
+  24: UiohookKey.O,
+  25: UiohookKey.P,
+  30: UiohookKey.A,
+  31: UiohookKey.S,
+  32: UiohookKey.D,
+  33: UiohookKey.F,
+  34: UiohookKey.G,
+  35: UiohookKey.H,
+  36: UiohookKey.J,
+  37: UiohookKey.K,
+  38: UiohookKey.L,
+  44: UiohookKey.Z,
+  45: UiohookKey.X,
+  46: UiohookKey.C,
+  47: UiohookKey.V,
+  48: UiohookKey.B,
+  49: UiohookKey.N,
+  50: UiohookKey.M,
+  // 数字键（主键盘区）- 直接使用 keycode 值
+  2: 2, // 1
+  3: 3, // 2
+  4: 4, // 3
+  5: 5, // 4
+  6: 6, // 5
+  7: 7, // 6
+  8: 8, // 7
+  9: 9, // 8
+  10: 10, // 9
+  11: 11, // 0
+  // 特殊字符键
+  41: UiohookKey.Backquote, // 反引号
+  12: UiohookKey.Minus, // 减号
+  13: UiohookKey.Equal, // 等号
+  26: UiohookKey.BracketLeft, // 左方括号
+  27: UiohookKey.BracketRight, // 右方括号
+  43: UiohookKey.Backslash, // 反斜杠
+  39: UiohookKey.Semicolon, // 分号
+  40: UiohookKey.Quote, // 单引号
+  51: UiohookKey.Comma, // 逗号
+  52: UiohookKey.Period, // 句号
+  53: UiohookKey.Slash, // 斜杠
+  // 功能键
+  57: UiohookKey.Space,
+  28: UiohookKey.Enter,
+  1: UiohookKey.Escape,
+  14: UiohookKey.Backspace,
+  15: UiohookKey.Tab
+}
+
+/**
+ * 抑制快捷键事件
+ * 通过立即释放所有当前按下的按键，防止事件传播到底层应用
+ *
+ * 工作原理：
+ * 1. 当检测到快捷键（如 Alt+Q）时，立即释放 Q 和 Alt 键
+ * 2. 底层应用只会收到 keyup 事件，不会触发快捷键功能
+ * 3. 用户自然释放按键时，keyup 监听器会更新 activeModifiers 状态
+ *
+ * @param keycode 触发键的 keycode
+ */
+function suppressHotkeyEvent(keycode: number): void {
+  try {
+    console.log('[Suppress] Suppressing hotkey event for keycode:', keycode)
+
+    // 1. 先释放触发键本身（例如 Q 键）
+    const triggerKey = KEYCODE_TO_UIOHOOK_KEY[keycode]
+    if (triggerKey) {
+      uIOhook.keyToggle(triggerKey, 'up')
+      console.log('[Suppress] Released trigger key:', keycode)
+    }
+
+    // 2. 释放所有当前按下的修饰键（例如 Alt）
+    // 这样底层应用只会收到 keyup，不会触发 Alt+Q 组合键
+    activeModifiers.forEach((modifier) => {
+      let keyToRelease: number | null = null
+
+      switch (modifier) {
+        case 'Ctrl':
+          keyToRelease = UiohookKey.Ctrl
+          break
+        case 'Alt':
+          keyToRelease = UiohookKey.Alt
+          break
+        case 'Shift':
+          keyToRelease = UiohookKey.Shift
+          break
+        case 'Meta':
+          keyToRelease = UiohookKey.Meta
+          break
+      }
+
+      if (keyToRelease) {
+        uIOhook.keyToggle(keyToRelease, 'up')
+        console.log('[Suppress] Released modifier:', modifier)
+      }
+    })
+
+    console.log('[Suppress] ✓ Hotkey event suppressed successfully')
+  } catch (error) {
+    console.error('[Suppress] ✗ Failed to suppress hotkey event:', error)
+  }
 }
 
 /**
@@ -315,6 +494,9 @@ export function setupGlobalMouseListener(): void {
 
   // Keyboard events for modifier tracking and keyboard shortcuts
   uIOhook.on('keydown', (event: UiohookKeyboardEvent) => {
+    // 更新最后事件时间（健康检查）
+    lastEventTime = Date.now()
+
     const modifierName = KEY_CODE_TO_MODIFIER[event.keycode]
     if (modifierName) {
       activeModifiers.add(modifierName)
@@ -328,6 +510,10 @@ export function setupGlobalMouseListener(): void {
     const shortcutInfo = checkShortcutHotkeyTriggered(event.keycode, activeModifiers)
     if (shortcutInfo) {
       console.log(`[MouseListener] AI Shortcut hotkey detected: ${shortcutInfo.name}`)
+
+      // 🚫 立即抑制快捷键事件，防止穿透到底层应用
+      suppressHotkeyEvent(event.keycode)
+
       // 异步触发快捷指令（包括捕获文本和打开运行器）
       triggerShortcut(shortcutInfo).catch((err) => {
         console.error('[MouseListener] Failed to trigger shortcut:', err)
@@ -340,6 +526,9 @@ export function setupGlobalMouseListener(): void {
       if (checkModifiersMatch()) {
         console.log(`Keyboard trigger detected: ${currentTrigger}`)
         console.log('[MouseListener] 快速捕获选中文本并显示 Super Panel...')
+
+        // 🚫 立即抑制快捷键事件，防止穿透到底层应用
+        suppressHotkeyEvent(event.keycode)
 
         // 🚀 性能优化：快速捕获后立即显示
         ;(async () => {
@@ -365,6 +554,9 @@ export function setupGlobalMouseListener(): void {
   })
 
   uIOhook.on('keyup', (event: UiohookKeyboardEvent) => {
+    // 更新最后事件时间（健康检查）
+    lastEventTime = Date.now()
+
     const modifierName = KEY_CODE_TO_MODIFIER[event.keycode]
     if (modifierName) {
       activeModifiers.delete(modifierName)
@@ -376,11 +568,15 @@ export function setupGlobalMouseListener(): void {
 
   // Mouse button down event
   uIOhook.on('mousedown', (event: UiohookMouseEvent) => {
+    // 更新最后事件时间（健康检查）
+    lastEventTime = Date.now()
     handleButtonDown(event.button as number, event.x as number, event.y as number)
   })
 
   // Mouse button up event
   uIOhook.on('mouseup', (event: UiohookMouseEvent) => {
+    // 更新最后事件时间（健康检查）
+    lastEventTime = Date.now()
     handleButtonUp(event.button as number)
 
     // Left button (button 1) - hide Super Panel when clicking outside
@@ -391,12 +587,19 @@ export function setupGlobalMouseListener(): void {
 
   // Mouse move event - 检测按键按下期间的鼠标移动
   uIOhook.on('mousemove', (event: UiohookMouseEvent) => {
+    // 更新最后事件时间（健康检查）
+    lastEventTime = Date.now()
     handleMouseMove(event.x as number, event.y as number)
   })
 
   // Start the hook
   uIOhook.start()
   isListening = true
+  lastEventTime = Date.now()
+
+  // 启动健康检查
+  startHealthCheck()
+
   console.log('Global mouse listener started')
 }
 
@@ -409,13 +612,70 @@ export function stopGlobalMouseListener(): void {
   }
 
   try {
+    // 停止健康检查
+    stopHealthCheck()
+
     uIOhook.stop()
     isListening = false
     activeModifiers.clear()
+    cancelLongPress()
     console.log('Global mouse listener stopped')
   } catch (error) {
     console.error('Error stopping uIOhook:', error)
   }
+}
+
+/**
+ * Restart global mouse listener
+ * 用于系统解锁后恢复监听器
+ */
+export function restartGlobalMouseListener(): void {
+  console.log('[MouseListener] Restarting global mouse listener...')
+
+  // 先停止现有的监听器（如果存在）
+  if (isListening) {
+    try {
+      uIOhook.stop()
+      console.log('[MouseListener] Stopped existing listener')
+    } catch (error) {
+      console.error('[MouseListener] Error stopping existing listener:', error)
+    }
+  }
+
+  // 重置所有状态
+  isListening = false
+  activeModifiers.clear()
+  cancelLongPress()
+
+  // 等待一小段时间，确保系统完全释放了钩子
+  setTimeout(() => {
+    try {
+      // 重新启动监听器
+      setupGlobalMouseListener()
+      console.log('[MouseListener] ✓ Global mouse listener restarted successfully')
+    } catch (error) {
+      console.error('[MouseListener] ✗ Failed to restart listener:', error)
+      // 如果重启失败，再尝试一次
+      setTimeout(() => {
+        try {
+          setupGlobalMouseListener()
+          console.log('[MouseListener] ✓ Global mouse listener restarted on retry')
+        } catch (retryError) {
+          console.error('[MouseListener] ✗ Failed to restart listener on retry:', retryError)
+        }
+      }, 1000)
+    }
+  }, 100)
+}
+
+/**
+ * Clear modifier states
+ * 用于系统锁定时清除修饰键状态
+ */
+export function clearModifierStates(): void {
+  activeModifiers.clear()
+  cancelLongPress()
+  console.log('[MouseListener] Modifier states cleared')
 }
 
 /**
@@ -437,4 +697,60 @@ export function getLongPressThreshold(): number {
  */
 export function getCurrentTrigger(): string | null {
   return currentTrigger
+}
+
+/**
+ * Start health check
+ * 定期检查 uIOhook 是否还在正常工作
+ * 如果长时间没有收到任何事件（可能表示钩子失效），自动重启
+ */
+function startHealthCheck(): void {
+  // 先停止之前的健康检查（如果存在）
+  stopHealthCheck()
+
+  // 每 30 秒检查一次
+  healthCheckInterval = setInterval(() => {
+    if (!isListening) {
+      // 如果监听器已停止，不需要健康检查
+      return
+    }
+
+    const timeSinceLastEvent = Date.now() - lastEventTime
+
+    // 如果超过 5 分钟没有收到任何事件
+    // 注意：这个阈值设置得比较保守，避免误判
+    // 因为用户可能真的 5 分钟没有移动鼠标或按键
+    // 但如果用户刚解锁系统，这个检查可以作为额外的保险
+    const HEALTH_CHECK_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+
+    if (timeSinceLastEvent > HEALTH_CHECK_THRESHOLD) {
+      console.warn('===============================================')
+      console.warn(
+        `⚠️ Health Check: No events received for ${Math.floor(timeSinceLastEvent / 1000)}s`
+      )
+      console.warn('uIOhook may have stopped working, attempting restart...')
+      console.warn('===============================================')
+
+      // 尝试重启监听器
+      try {
+        restartGlobalMouseListener()
+        console.log('[HealthCheck] ✓ Mouse listener restarted')
+      } catch (error) {
+        console.error('[HealthCheck] ✗ Failed to restart mouse listener:', error)
+      }
+    }
+  }, 30000) // 每 30 秒检查一次
+
+  console.log('[HealthCheck] Health check started')
+}
+
+/**
+ * Stop health check
+ */
+function stopHealthCheck(): void {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval)
+    healthCheckInterval = null
+    console.log('[HealthCheck] Health check stopped')
+  }
 }
