@@ -257,6 +257,80 @@ class PluginManager {
   }
 
   /**
+   * 重新扫描并加载所有插件（热重载）
+   * 用于在安装新插件后即时加载，无需重启应用
+   */
+  async rescanPlugins(): Promise<{
+    newPlugins: string[]
+    removedPlugins: string[]
+    totalPlugins: number
+  }> {
+    console.log('Rescanning plugins directory...')
+
+    try {
+      // 扫描插件目录
+      const manifests = await scanPlugins()
+      const scannedPluginIds = new Set(manifests.map((m) => m.id))
+      const currentPluginIds = new Set(this.plugins.keys())
+
+      // 找出新增的插件
+      const newPluginIds = manifests.filter((m) => !currentPluginIds.has(m.id)).map((m) => m.id)
+
+      // 找出已删除的插件
+      const removedPluginIds = Array.from(currentPluginIds).filter(
+        (id) => !scannedPluginIds.has(id)
+      )
+
+      // 加载新插件
+      for (const manifest of manifests) {
+        if (!currentPluginIds.has(manifest.id)) {
+          console.log(`Loading new plugin: ${manifest.name} (${manifest.id})`)
+          await this.loadPlugin(manifest)
+
+          // 检查是否应该自动激活（如果之前启用过）
+          const isEnabled = await isPluginEnabled(manifest.id)
+          if (isEnabled) {
+            try {
+              await this.activatePlugin(manifest.id)
+            } catch (error) {
+              console.error(`Failed to activate plugin ${manifest.id}:`, error)
+            }
+          }
+        }
+      }
+
+      // 移除已删除的插件
+      for (const pluginId of removedPluginIds) {
+        const plugin = this.plugins.get(pluginId)
+        if (plugin) {
+          console.log(`Removing deleted plugin: ${plugin.manifest.name} (${pluginId})`)
+          if (plugin.activated) {
+            try {
+              await this.deactivatePlugin(pluginId)
+            } catch (error) {
+              console.error(`Failed to deactivate plugin ${pluginId}:`, error)
+            }
+          }
+          unloadPluginModule(plugin.manifest)
+          this.plugins.delete(pluginId)
+        }
+      }
+
+      const result = {
+        newPlugins: newPluginIds,
+        removedPlugins: removedPluginIds,
+        totalPlugins: this.plugins.size
+      }
+
+      console.log('Rescan completed:', result)
+      return result
+    } catch (error) {
+      console.error('Failed to rescan plugins:', error)
+      throw error
+    }
+  }
+
+  /**
    * 获取所有插件
    */
   getAllPlugins(): PluginManifest[] {

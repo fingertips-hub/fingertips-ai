@@ -38,9 +38,12 @@ export const usePluginStore = defineStore('plugin', () => {
 
   /**
    * 加载所有插件
+   * @param silent 静默加载（不显示 loading 状态）
    */
-  async function loadPlugins(): Promise<void> {
-    isLoading.value = true
+  async function loadPlugins(silent = false): Promise<void> {
+    if (!silent) {
+      isLoading.value = true
+    }
     error.value = null
 
     try {
@@ -61,15 +64,20 @@ export const usePluginStore = defineStore('plugin', () => {
       error.value = (err as Error).message
       plugins.value = []
     } finally {
-      isLoading.value = false
+      if (!silent) {
+        isLoading.value = false
+      }
     }
   }
 
   /**
    * 加载已启用的插件
+   * @param silent 静默加载（不显示 loading 状态）
    */
-  async function loadEnabledPlugins(): Promise<void> {
-    isLoading.value = true
+  async function loadEnabledPlugins(silent = false): Promise<void> {
+    if (!silent) {
+      isLoading.value = true
+    }
     error.value = null
 
     try {
@@ -90,7 +98,9 @@ export const usePluginStore = defineStore('plugin', () => {
       error.value = (err as Error).message
       enabledPlugins.value = []
     } finally {
-      isLoading.value = false
+      if (!silent) {
+        isLoading.value = false
+      }
     }
   }
 
@@ -113,8 +123,8 @@ export const usePluginStore = defineStore('plugin', () => {
           plugin.activated = enabled
         }
 
-        // 重新加载启用的插件列表
-        await loadEnabledPlugins()
+        // 静默加载启用的插件列表（不触发 loading 状态，避免滚动位置丢失）
+        await loadEnabledPlugins(true)
 
         console.log(`Plugin ${pluginId} ${enabled ? 'enabled' : 'disabled'}`)
         return true
@@ -213,8 +223,8 @@ export const usePluginStore = defineStore('plugin', () => {
       const result = await window.api.plugin.reload(pluginId)
 
       if (result.success) {
-        // 重新加载插件列表
-        await loadPlugins()
+        // 静默加载插件列表（不触发 loading 状态，避免滚动位置丢失）
+        await loadPlugins(true)
         console.log(`Plugin ${pluginId} reloaded`)
         return true
       } else {

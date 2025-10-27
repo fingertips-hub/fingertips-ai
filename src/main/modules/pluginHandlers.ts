@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { pluginManager } from './pluginManager'
 import { getPluginConfig, setPluginConfig } from './pluginStore'
+import { installPluginFromZip, uninstallPlugin, updatePlugin } from './pluginLoader'
 
 /**
  * 插件 IPC 处理器
@@ -68,20 +69,23 @@ export function setupPluginHandlers(): void {
   /**
    * 设置插件配置
    */
-  ipcMain.handle('plugin:set-config', async (_event, pluginId: string, config: any) => {
-    try {
-      await setPluginConfig(pluginId, config)
-      return { success: true }
-    } catch (error) {
-      console.error(`Failed to set plugin config for ${pluginId}:`, error)
-      return { success: false, error: (error as Error).message }
+  ipcMain.handle(
+    'plugin:set-config',
+    async (_event, pluginId: string, config: Record<string, unknown>) => {
+      try {
+        await setPluginConfig(pluginId, config)
+        return { success: true }
+      } catch (error) {
+        console.error(`Failed to set plugin config for ${pluginId}:`, error)
+        return { success: false, error: (error as Error).message }
+      }
     }
-  })
+  )
 
   /**
    * 执行插件
    */
-  ipcMain.handle('plugin:execute', async (_event, pluginId: string, params: any) => {
+  ipcMain.handle('plugin:execute', async (_event, pluginId: string, params: unknown) => {
     try {
       const result = await pluginManager.executePlugin(pluginId, params)
       return { success: true, data: result }
@@ -128,6 +132,154 @@ export function setupPluginHandlers(): void {
     }
   })
 
+  /**
+   * 从 ZIP 文件安装插件
+   */
+  ipcMain.handle('plugin:install-from-zip', async (_event, zipPath: string) => {
+    try {
+      console.log(`Installing plugin from ZIP: ${zipPath}`)
+      const result = await installPluginFromZip(zipPath)
+
+      if (result.success && result.manifest) {
+        console.log(`Plugin ${result.manifest.name} installed successfully`)
+
+        // 安装成功后，立即重新扫描并加载新插件（热重载）
+        try {
+          const rescanResult = await pluginManager.rescanPlugins()
+          console.log('Plugins rescanned after installation:', rescanResult)
+
+          if (rescanResult.newPlugins.length > 0) {
+            console.log(`New plugin loaded: ${rescanResult.newPlugins.join(', ')}`)
+          }
+        } catch (rescanError) {
+          console.error('Failed to rescan plugins after installation:', rescanError)
+          // 不影响安装结果，只是需要手动刷新
+        }
+      }
+
+      return result
+    } catch (error) {
+      console.error('Failed to install plugin from ZIP:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '安装插件时发生未知错误'
+      }
+    }
+  })
+
+  /**
+   * 卸载插件
+   */
+  ipcMain.handle('plugin:uninstall', async (_event, pluginId: string) => {
+    try {
+      console.log(`Uninstalling plugin: ${pluginId}`)
+
+      // 先停用插件
+      const plugin = pluginManager.getPlugin(pluginId)
+      if (plugin && plugin.enabled) {
+        await pluginManager.togglePlugin(pluginId, false)
+      }
+
+      // 卸载插件
+      const result = await uninstallPlugin(pluginId)
+
+      if (result.success) {
+        console.log(`Plugin ${pluginId} uninstalled successfully`)
+
+        // 卸载成功后，立即重新扫描（移除已卸载的插件）
+        try {
+          const rescanResult = await pluginManager.rescanPlugins()
+          console.log('Plugins rescanned after uninstallation:', rescanResult)
+
+          if (rescanResult.removedPlugins.length > 0) {
+            console.log(`Plugins removed: ${rescanResult.removedPlugins.join(', ')}`)
+          }
+        } catch (rescanError) {
+          console.error('Failed to rescan plugins after uninstallation:', rescanError)
+        }
+      }
+
+      return result
+    } catch (error) {
+      console.error(`Failed to uninstall plugin ${pluginId}:`, error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '卸载插件时发生未知错误'
+      }
+    }
+  })
+
+  /**
+   * 更新插件
+   */
+  ipcMain.handle('plugin:update', async (_event, pluginId: string, zipPath: string) => {
+    try {
+      console.log(`Updating plugin ${pluginId} from ZIP: ${zipPath}`)
+
+      // 先停用插件
+      const plugin = pluginManager.getPlugin(pluginId)
+      const wasEnabled = plugin?.enabled || false
+
+      if (plugin && plugin.enabled) {
+        await pluginManager.togglePlugin(pluginId, false)
+      }
+
+      // 更新插件
+      const result = await updatePlugin(pluginId, zipPath)
+
+      if (result.success) {
+        console.log(`Plugin ${pluginId} updated successfully`)
+
+        // 更新成功后，立即重新扫描并加载新版本
+        try {
+          const rescanResult = await pluginManager.rescanPlugins()
+          console.log('Plugins rescanned after update:', rescanResult)
+
+          // 如果之前是启用状态，重新启用
+          if (wasEnabled && result.pluginId) {
+            try {
+              await pluginManager.togglePlugin(result.pluginId, true)
+              console.log(`Plugin ${result.pluginId} re-enabled after update`)
+            } catch (error) {
+              console.error(`Failed to re-enable plugin after update:`, error)
+            }
+          }
+        } catch (rescanError) {
+          console.error('Failed to rescan plugins after update:', rescanError)
+        }
+      }
+
+      return result
+    } catch (error) {
+      console.error(`Failed to update plugin ${pluginId}:`, error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '更新插件时发生未知错误'
+      }
+    }
+  })
+
+  /**
+   * 重新扫描插件目录（热重载）
+   */
+  ipcMain.handle('plugin:rescan', async () => {
+    try {
+      console.log('Manually rescanning plugins...')
+      const result = await pluginManager.rescanPlugins()
+
+      return {
+        success: true,
+        data: result
+      }
+    } catch (error) {
+      console.error('Failed to rescan plugins:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '重新扫描插件时发生未知错误'
+      }
+    }
+  })
+
   console.log('Plugin IPC handlers setup complete')
 }
 
@@ -146,6 +298,10 @@ export function cleanupPluginHandlers(): void {
   ipcMain.removeHandler('plugin:execute')
   ipcMain.removeHandler('plugin:reload')
   ipcMain.removeHandler('plugin:get-details')
+  ipcMain.removeHandler('plugin:install-from-zip')
+  ipcMain.removeHandler('plugin:uninstall')
+  ipcMain.removeHandler('plugin:update')
+  ipcMain.removeHandler('plugin:rescan')
 
   console.log('Plugin IPC handlers cleaned up')
 }

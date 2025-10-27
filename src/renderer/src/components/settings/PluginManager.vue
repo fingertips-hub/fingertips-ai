@@ -6,11 +6,112 @@
         <h1 class="title">插件管理</h1>
         <p class="subtitle">管理和配置应用插件,扩展功能</p>
       </div>
-      <button class="btn-reload" @click="handleReloadAll" :disabled="isLoading">
-        <Icon icon="mdi:refresh" class="icon" :class="{ spinning: isLoading }" />
-        刷新列表
-      </button>
+      <div class="header-actions">
+        <button class="btn-primary" @click="showInstallDialog = true">
+          <Icon icon="mdi:plus" class="icon" />
+          添加插件
+        </button>
+        <button class="btn-reload" :disabled="isLoading" @click="handleReloadAll">
+          <Icon icon="mdi:refresh" class="icon" :class="{ spinning: isLoading }" />
+          刷新列表
+        </button>
+      </div>
     </div>
+
+    <!-- 安装插件对话框 -->
+    <transition name="dialog-fade">
+      <div v-if="showInstallDialog" class="dialog-overlay" @click="closeInstallDialog">
+        <div class="dialog-container" @click.stop>
+          <div class="dialog-header">
+            <h2 class="dialog-title">安装插件</h2>
+            <button class="dialog-close" @click="closeInstallDialog">
+              <Icon icon="mdi:close" />
+            </button>
+          </div>
+
+          <div class="dialog-body">
+            <!-- 对话框内的消息提示 -->
+            <transition name="slide-down">
+              <div
+                v-if="dialogMessage"
+                :class="['dialog-message', `message-${dialogMessage.type}`]"
+              >
+                <Icon
+                  :icon="
+                    dialogMessage.type === 'success'
+                      ? 'mdi:check-circle'
+                      : dialogMessage.type === 'error'
+                        ? 'mdi:alert-circle'
+                        : dialogMessage.type === 'warning'
+                          ? 'mdi:alert'
+                          : 'mdi:information'
+                  "
+                  class="message-icon"
+                />
+                <span class="message-text">{{ dialogMessage.text }}</span>
+                <button class="message-close" @click="dialogMessage = null">
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            </transition>
+
+            <!-- 拖拽区域 -->
+            <div
+              class="drop-zone-dialog"
+              :class="{ 'drag-over': isDragging, installing: isInstalling }"
+              @dragenter.prevent="handleDragEnter"
+              @dragover.prevent
+              @dragleave.prevent="handleDragLeave"
+              @drop.prevent="handleDrop"
+              @click="selectZipFile"
+            >
+              <Icon
+                :icon="isInstalling ? 'mdi:loading' : 'mdi:package-variant-closed'"
+                class="drop-icon"
+                :class="{ spinning: isInstalling }"
+              />
+              <div class="drop-text">
+                <span v-if="isInstalling">正在安装插件...</span>
+                <span v-else>拖拽 ZIP 文件到此处，或点击选择文件</span>
+              </div>
+              <div v-if="!isInstalling" class="drop-hint">支持 .zip 格式，最大 100MB</div>
+            </div>
+
+            <!-- 安装说明 -->
+            <div class="install-tips">
+              <div class="tip-item">
+                <Icon icon="mdi:information" class="tip-icon" />
+                <span>插件必须包含有效的 manifest.json 文件</span>
+              </div>
+              <div class="tip-item">
+                <Icon icon="mdi:check-circle" class="tip-icon tip-icon-success" />
+                <span>安装后会自动加载，无需重启应用即可使用</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 消息提示 -->
+    <transition name="slide-down">
+      <div v-if="message" :class="['message-box', `message-${message.type}`]">
+        <Icon
+          :icon="
+            message.type === 'success'
+              ? 'mdi:check-circle'
+              : message.type === 'error'
+                ? 'mdi:alert-circle'
+                : 'mdi:information'
+          "
+          class="message-icon"
+        />
+        <span class="message-text">{{ message.text }}</span>
+        <button class="message-close" @click="message = null">
+          <Icon icon="mdi:close" />
+        </button>
+      </div>
+    </transition>
 
     <!-- 搜索和筛选栏 -->
     <div class="filter-bar">
@@ -31,30 +132,32 @@
       <!-- 关键词分类 -->
       <div class="keywords-filter">
         <button
-          :class="['keyword-chip', { active: selectedKeyword === null }]"
+          class="keyword-chip"
+          :class="{ active: selectedKeyword === null }"
           @click="selectedKeyword = null"
         >
           <Icon icon="mdi:apps" class="chip-icon" />
           <span>全部 ({{ plugins.length }})</span>
         </button>
         <button
-          v-for="keyword in allKeywords"
+          v-for="keyword in visibleKeywords"
           :key="keyword"
-          :class="['keyword-chip', { active: selectedKeyword === keyword }]"
+          class="keyword-chip"
+          :class="{ active: selectedKeyword === keyword }"
           @click="selectedKeyword = keyword"
         >
           <Icon icon="mdi:tag" class="chip-icon" />
           <span>{{ keyword }} ({{ getKeywordCount(keyword) }})</span>
         </button>
+        <button
+          v-if="hiddenKeywordsCount > 0"
+          class="keyword-chip keyword-chip-expand"
+          @click="showAllKeywords = !showAllKeywords"
+        >
+          <Icon :icon="showAllKeywords ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="chip-icon" />
+          <span>{{ showAllKeywords ? '收起' : `更多 (${hiddenKeywordsCount})` }}</span>
+        </button>
       </div>
-    </div>
-
-    <!-- 结果统计 -->
-    <div v-if="!isLoading && !error" class="result-stats">
-      <span class="stats-text">
-        显示 <strong>{{ filteredPlugins.length }}</strong> 个插件
-        <template v-if="searchQuery || selectedKeyword"> (已筛选) </template>
-      </span>
     </div>
 
     <!-- 加载状态 -->
@@ -127,21 +230,41 @@
             <span class="switch-label">{{ plugin.enabled ? '已启用' : '已禁用' }}</span>
           </div>
 
-          <!-- 重新加载按钮 -->
-          <button class="btn-reload-single" @click="handleReload(plugin.id)" title="重新加载插件">
-            <Icon icon="mdi:refresh" />
-          </button>
+          <div class="action-buttons">
+            <!-- 重新加载按钮 -->
+            <button class="btn-action" @click="handleReload(plugin.id)" title="重新加载插件">
+              <Icon icon="mdi:refresh" />
+            </button>
 
-          <!-- 主页链接 -->
-          <a
-            v-if="plugin.homepage"
-            :href="plugin.homepage"
-            target="_blank"
-            class="btn-homepage"
-            title="访问插件主页"
-          >
-            <Icon icon="mdi:open-in-new" />
-          </a>
+            <!-- 更新按钮 -->
+            <button
+              class="btn-action"
+              @click="handleUpdatePlugin(plugin.id, plugin.name)"
+              title="更新插件"
+            >
+              <Icon icon="mdi:upload" />
+            </button>
+
+            <!-- 卸载按钮 -->
+            <button
+              class="btn-action btn-danger"
+              @click="handleUninstall(plugin.id, plugin.name)"
+              title="卸载插件"
+            >
+              <Icon icon="mdi:delete" />
+            </button>
+
+            <!-- 主页链接 -->
+            <a
+              v-if="plugin.homepage"
+              :href="plugin.homepage"
+              target="_blank"
+              class="btn-action"
+              title="访问插件主页"
+            >
+              <Icon icon="mdi:open-in-new" />
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -164,7 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { usePluginStore } from '../../stores/plugin'
 import { storeToRefs } from 'pinia'
@@ -175,21 +298,76 @@ const { plugins, isLoading, error } = storeToRefs(pluginStore)
 // 搜索和筛选状态
 const searchQuery = ref('')
 const selectedKeyword = ref<string | null>(null)
+const showAllKeywords = ref(false)
+const MAX_VISIBLE_KEYWORDS = 8 // 默认显示的标签数量
+
+// 拖拽和安装状态
+const isDragging = ref(false)
+const isInstalling = ref(false)
+const dragCounter = ref(0)
+const showInstallDialog = ref(false)
+
+// 消息提示
+interface Message {
+  type: 'success' | 'error' | 'info' | 'warning'
+  text: string
+}
+const message = ref<Message | null>(null)
+const dialogMessage = ref<Message | null>(null)
+
+// 键盘事件处理
+const handleKeyDown = (e: KeyboardEvent): void => {
+  if (e.key === 'Escape' && showInstallDialog.value) {
+    closeInstallDialog()
+  }
+}
 
 // 初始化加载
 onMounted(() => {
   pluginStore.loadPlugins()
+  // 添加键盘事件监听（ESC 关闭对话框）
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+// 组件卸载时移除监听
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 /**
- * 获取所有唯一的关键词
+ * 获取所有唯一的关键词（按插件数量排序）
  */
 const allKeywords = computed(() => {
   const keywordSet = new Set<string>()
   plugins.value.forEach((plugin) => {
     plugin.keywords?.forEach((keyword) => keywordSet.add(keyword))
   })
-  return Array.from(keywordSet).sort()
+  // 按插件数量降序排列，热门标签优先
+  return Array.from(keywordSet).sort((a, b) => {
+    const countA = getKeywordCount(a)
+    const countB = getKeywordCount(b)
+    if (countA !== countB) {
+      return countB - countA // 数量多的在前
+    }
+    return a.localeCompare(b) // 数量相同则按字母排序
+  })
+})
+
+/**
+ * 可见的关键词列表（支持折叠）
+ */
+const visibleKeywords = computed(() => {
+  if (showAllKeywords.value || allKeywords.value.length <= MAX_VISIBLE_KEYWORDS) {
+    return allKeywords.value
+  }
+  return allKeywords.value.slice(0, MAX_VISIBLE_KEYWORDS)
+})
+
+/**
+ * 剩余隐藏的关键词数量
+ */
+const hiddenKeywordsCount = computed(() => {
+  return Math.max(0, allKeywords.value.length - MAX_VISIBLE_KEYWORDS)
 })
 
 /**
@@ -257,12 +435,262 @@ async function handleReload(pluginId: string): Promise<void> {
 }
 
 /**
- * 重新加载所有插件
+ * 重新加载所有插件（重新扫描并加载新插件）
  */
 async function handleReloadAll(): Promise<void> {
-  await pluginStore.loadPlugins()
-  // 重新加载后重置筛选条件
-  resetFilters()
+  try {
+    isLoading.value = true
+    showMessage('info', '正在重新扫描插件...', 0)
+
+    // 调用重新扫描 API
+    const rescanResult = await window.api.plugin.rescan()
+
+    if (rescanResult.success && rescanResult.data) {
+      const { newPlugins, removedPlugins, totalPlugins } = rescanResult.data
+
+      // 静默加载插件列表（已有 loading 状态管理）
+      await pluginStore.loadPlugins(true)
+
+      // 重新加载后重置筛选条件
+      resetFilters()
+
+      // 根据扫描结果显示不同的消息
+      if (newPlugins.length > 0 || removedPlugins.length > 0) {
+        const messages: string[] = []
+        if (newPlugins.length > 0) {
+          messages.push(`新增 ${newPlugins.length} 个插件`)
+        }
+        if (removedPlugins.length > 0) {
+          messages.push(`移除 ${removedPlugins.length} 个插件`)
+        }
+        showMessage('success', `${messages.join('，')}，当前共 ${totalPlugins} 个插件`)
+      } else {
+        showMessage('success', `插件列表刷新成功，共 ${totalPlugins} 个插件`)
+      }
+    } else {
+      showMessage('error', `刷新失败: ${rescanResult.error || '未知错误'}`)
+    }
+  } catch (error) {
+    console.error('Failed to reload plugins:', error)
+    showMessage('error', `刷新失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+/**
+ * 显示消息（主界面）
+ */
+function showMessage(type: Message['type'], text: string, duration = 5000): void {
+  message.value = { type, text }
+
+  if (duration > 0) {
+    setTimeout(() => {
+      if (message.value?.text === text) {
+        message.value = null
+      }
+    }, duration)
+  }
+}
+
+/**
+ * 显示对话框内的消息
+ */
+function showDialogMessage(type: Message['type'], text: string, duration = 5000): void {
+  dialogMessage.value = { type, text }
+
+  if (duration > 0) {
+    setTimeout(() => {
+      if (dialogMessage.value?.text === text) {
+        dialogMessage.value = null
+      }
+    }, duration)
+  }
+}
+
+/**
+ * 处理拖拽进入
+ */
+function handleDragEnter(): void {
+  dragCounter.value++
+  if (dragCounter.value === 1) {
+    isDragging.value = true
+  }
+}
+
+/**
+ * 处理拖拽离开
+ */
+function handleDragLeave(): void {
+  dragCounter.value--
+  if (dragCounter.value === 0) {
+    isDragging.value = false
+  }
+}
+
+/**
+ * 处理文件拖放
+ */
+async function handleDrop(e: DragEvent): Promise<void> {
+  isDragging.value = false
+  dragCounter.value = 0
+
+  if (isInstalling.value) return
+
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  const file = files[0]
+  if (!file.name.endsWith('.zip')) {
+    showDialogMessage('error', '请选择 ZIP 格式的插件文件')
+    return
+  }
+
+  // 使用 Electron 官方 API 获取文件路径
+  const filePath = window.api.launcher.getFilePath(file)
+  if (!filePath) {
+    showDialogMessage('error', '无法获取文件路径，请重试')
+    return
+  }
+
+  await installPlugin(filePath)
+}
+
+/**
+ * 选择 ZIP 文件
+ */
+function selectZipFile(): void {
+  if (isInstalling.value) return
+
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.zip'
+  input.onchange = async (e) => {
+    const target = e.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (file) {
+      // 使用 Electron 官方 API 获取文件路径
+      const filePath = window.api.launcher.getFilePath(file)
+      if (!filePath) {
+        showDialogMessage('error', '无法获取文件路径，请重试')
+        return
+      }
+      await installPlugin(filePath)
+    }
+  }
+  input.click()
+}
+
+/**
+ * 安装插件
+ */
+async function installPlugin(filePath: string): Promise<void> {
+  try {
+    isInstalling.value = true
+    // 在对话框内显示进度提示
+    showDialogMessage('info', '正在安装插件，请稍候...', 0)
+
+    const result = await window.api.plugin.installFromZip(filePath)
+
+    if (result.success && result.manifest) {
+      // 静默加载插件列表（避免滚动位置丢失）
+      await pluginStore.loadPlugins(true)
+      // 关闭对话框
+      showInstallDialog.value = false
+      // 清除对话框消息
+      dialogMessage.value = null
+      // 在主界面显示成功消息
+      showMessage('success', `插件 "${result.manifest.name}" 安装成功！已自动加载，可立即使用。`)
+    } else {
+      // 在对话框内显示错误
+      showDialogMessage('error', `安装失败: ${result.error || '未知错误'}`)
+    }
+  } catch (error) {
+    console.error('Failed to install plugin:', error)
+    // 在对话框内显示错误
+    showDialogMessage('error', `安装失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  } finally {
+    isInstalling.value = false
+  }
+}
+
+/**
+ * 关闭安装对话框
+ */
+function closeInstallDialog(): void {
+  if (!isInstalling.value) {
+    showInstallDialog.value = false
+    isDragging.value = false
+    dragCounter.value = 0
+    // 清除对话框消息
+    dialogMessage.value = null
+  }
+}
+
+/**
+ * 卸载插件
+ */
+async function handleUninstall(pluginId: string, pluginName: string): Promise<void> {
+  // 确认对话框
+  const confirmed = confirm(`确定要卸载插件 "${pluginName}" 吗？\n\n卸载后将立即生效。`)
+
+  if (!confirmed) return
+
+  try {
+    showMessage('info', '正在卸载插件...', 0)
+
+    const result = await window.api.plugin.uninstall(pluginId)
+
+    if (result.success) {
+      showMessage('success', `插件 "${pluginName}" 卸载成功！已自动移除。`)
+      // 静默加载插件列表（避免滚动位置丢失）
+      await pluginStore.loadPlugins(true)
+    } else {
+      showMessage('error', `卸载失败: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('Failed to uninstall plugin:', error)
+    showMessage('error', `卸载失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  }
+}
+
+/**
+ * 更新插件
+ */
+async function handleUpdatePlugin(pluginId: string, pluginName: string): Promise<void> {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.zip'
+  input.onchange = async (e) => {
+    const target = e.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (!file) return
+
+    // 使用 Electron 官方 API 获取文件路径
+    const filePath = window.api.launcher.getFilePath(file)
+    if (!filePath) {
+      showMessage('error', '无法获取文件路径，请重试')
+      return
+    }
+
+    try {
+      showMessage('info', '正在更新插件，请稍候...', 0)
+
+      const result = await window.api.plugin.update(pluginId, filePath)
+
+      if (result.success) {
+        showMessage('success', `插件 "${pluginName}" 更新成功！已自动加载新版本。`)
+        // 静默加载插件列表（避免滚动位置丢失）
+        await pluginStore.loadPlugins(true)
+      } else {
+        showMessage('error', `更新失败: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Failed to update plugin:', error)
+      showMessage('error', `更新失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+  input.click()
 }
 </script>
 
@@ -404,16 +832,18 @@ async function handleReloadAll(): Promise<void> {
 .keyword-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 5px;
+  padding: 4px 10px;
   background: #f3f4f6;
   color: #6b7280;
   border: 2px solid transparent;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: 16px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .keyword-chip:hover {
@@ -427,8 +857,20 @@ async function handleReloadAll(): Promise<void> {
   border-color: #3b82f6;
 }
 
+.keyword-chip-expand {
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.keyword-chip-expand:hover {
+  background: #c7d2fe;
+  color: #4338ca;
+}
+
 .chip-icon {
-  font-size: 16px;
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* 结果统计 */
@@ -709,9 +1151,313 @@ input:checked + .slider:before {
   font-weight: 500;
 }
 
-/* 按钮 */
-.btn-reload-single,
-.btn-homepage {
+/* 头部操作按钮组 */
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgb(59 130 246 / 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* 对话框 */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.dialog-container {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dialog-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.dialog-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 20px;
+}
+
+.dialog-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.dialog-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* 对话框内的消息提示 */
+.dialog-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* 对话框内的拖拽区域 */
+.drop-zone-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 20px;
+}
+
+.drop-zone-dialog:hover:not(.installing) {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.drop-zone-dialog.drag-over {
+  border-color: #3b82f6;
+  background: #dbeafe;
+  transform: scale(1.02);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.drop-zone-dialog.installing {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.drop-icon {
+  font-size: 56px;
+  color: #3b82f6;
+  margin-bottom: 16px;
+}
+
+.drop-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.drop-hint {
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* 安装提示 */
+.install-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.tip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.tip-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #3b82f6;
+}
+
+.tip-icon-success {
+  color: #10b981;
+}
+
+/* 对话框动画 */
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.dialog-fade-enter-active .dialog-container,
+.dialog-fade-leave-active .dialog-container {
+  transition: all 0.3s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.dialog-fade-enter-from .dialog-container,
+.dialog-fade-leave-to .dialog-container {
+  transform: scale(0.95) translateY(-20px);
+  opacity: 0;
+}
+
+/* 消息提示 */
+.message-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.message-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.message-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.message-info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.message-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.message-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.message-text {
+  flex: 1;
+}
+
+.message-close {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 18px;
+  color: currentColor;
+  opacity: 0.7;
+}
+
+.message-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* 消息动画 */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+.slide-down-leave-to {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+/* 操作按钮组 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-action {
   width: 36px;
   height: 36px;
   display: flex;
@@ -727,10 +1473,18 @@ input:checked + .slider:before {
   text-decoration: none;
 }
 
-.btn-reload-single:hover,
-.btn-homepage:hover {
+.btn-action:hover {
   background: #e5e7eb;
   color: #111827;
+}
+
+.btn-action.btn-danger {
+  color: #dc2626;
+}
+
+.btn-action.btn-danger:hover {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 /* 空状态 */

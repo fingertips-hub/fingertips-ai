@@ -9,9 +9,9 @@ let settingsWindow: BrowserWindow | null = null
 // Settings window configuration
 const SETTINGS_WINDOW_CONFIG = {
   width: 1000,
-  height: 700,
+  height: 800,
   minWidth: 700,
-  minHeight: 500
+  minHeight: 800
 }
 
 /**

@@ -168,6 +168,35 @@ interface API {
       }
       error?: string
     }>
+    installFromZip: (zipPath: string) => Promise<{
+      success: boolean
+      manifest?: Record<string, unknown>
+      error?: string
+      pluginId?: string
+    }>
+    uninstall: (pluginId: string) => Promise<{
+      success: boolean
+      error?: string
+    }>
+    update: (
+      pluginId: string,
+      zipPath: string
+    ) => Promise<{
+      success: boolean
+      manifest?: Record<string, unknown>
+      error?: string
+      pluginId?: string
+    }>
+    rescan: () => Promise<{
+      success: boolean
+      data?: {
+        newPlugins: string[]
+        removedPlugins: string[]
+        totalPlugins: number
+      }
+      error?: string
+    }>
+    invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
   }
 }
 

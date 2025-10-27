@@ -219,6 +219,15 @@ const api = {
     reload: (pluginId: string) => ipcRenderer.invoke('plugin:reload', pluginId),
     // 获取插件详情
     getDetails: (pluginId: string) => ipcRenderer.invoke('plugin:get-details', pluginId),
+    // 从 ZIP 文件安装插件
+    installFromZip: (zipPath: string) => ipcRenderer.invoke('plugin:install-from-zip', zipPath),
+    // 卸载插件
+    uninstall: (pluginId: string) => ipcRenderer.invoke('plugin:uninstall', pluginId),
+    // 更新插件
+    update: (pluginId: string, zipPath: string) =>
+      ipcRenderer.invoke('plugin:update', pluginId, zipPath),
+    // 重新扫描插件目录（热重载）
+    rescan: () => ipcRenderer.invoke('plugin:rescan'),
     // 调用插件的 IPC 处理器
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     invoke: (channel: string, ...args: any[]) => {
