@@ -1,0 +1,28 @@
+{
+  "id": "quick-notes",
+  "name": "随手记",
+  "version": "1.0.0",
+  "description": "优雅的随手记事本,支持自动保存和多条笔记管理",
+  "author": "Fingertips AI",
+  "icon": "mdi:notebook-outline",
+  "keywords": ["笔记", "记事本", "备忘录", "notes"],
+  "license": "MIT",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["window", "notification"],
+
+  "config": {
+    "defaults": {
+      "notes": []
+    }
+  },
+
+  "ui": {
+    "hasPanel": false
+  }
+}

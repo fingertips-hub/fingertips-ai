@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>随手记</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* 2025 自然配色系统 */
+        --primary-color: #6366f1;
+        --primary-light: #818cf8;
+        --primary-dark: #4f46e5;
+        --accent-color: #ec4899;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+
+        /* 文字色阶 */
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-tertiary: #94a3b8;
+        --text-light: #cbd5e1;
+
+        /* 背景色阶 */
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --bg-glass: rgba(255, 255, 255, 0.7);
+
+        /* 边框 */
+        --border-color: #e2e8f0;
+        --border-subtle: #f1f5f9;
+
+        /* 阴影系统（更自然的层次）*/
+        --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+        --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.03);
+        --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+        --shadow-large: 0 8px 32px rgba(0, 0, 0, 0.08), 0 12px 48px rgba(0, 0, 0, 0.06);
+
+        /* 圆角系统（不规则变化）*/
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
+        --radius-curved: 24px;
+      }
+
+      /* 噪点质感背景 */
+      @keyframes grain {
+        0%,
+        100% {
+          transform: translate(0, 0);
+        }
+        10% {
+          transform: translate(-5%, -10%);
+        }
+        20% {
+          transform: translate(-15%, 5%);
+        }
+        30% {
+          transform: translate(7%, -25%);
+        }
+        40% {
+          transform: translate(-5%, 25%);
+        }
+        50% {
+          transform: translate(-15%, 10%);
+        }
+        60% {
+          transform: translate(15%, 0%);
+        }
+        70% {
+          transform: translate(0%, 15%);
+        }
+        80% {
+          transform: translate(3%, 35%);
+        }
+        90% {
+          transform: translate(-10%, 10%);
+        }
+      }
+
+      body {
+        font-family:
+          'SF Pro Display',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Inter',
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+        /* 优雅的蓝-粉双色渐变 - 保留品牌色与层次感 */
+        background: linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%);
+        min-height: 100vh;
+        padding: 24px;
+        color: var(--text-primary);
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* 噪点纹理层 */
+      body::before {
+        content: '';
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        right: -50%;
+        bottom: -50%;
+        width: 200%;
+        height: 200%;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        opacity: 0.6;
+        animation: grain 8s steps(10) infinite;
+        pointer-events: none;
+      }
+
+      #app {
+        max-width: 1280px;
+        margin: 0 auto;
+        /* 毛玻璃效果 - Glassmorphism */
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        /* 不规则圆角 */
+        border-radius: var(--radius-curved) var(--radius-curved) var(--radius-lg) var(--radius-lg);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: var(--shadow-large);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 48px);
+        position: relative;
+      }
+
+      /* 添加微妙的内发光 */
+      #app::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8) 50%, transparent);
+      }
+
+      /* 头部 - 大标题设计 */
+      .header {
+        /* 移除刺眼的渐变，使用微妙的背景 */
+        background: linear-gradient(
+          135deg,
+          rgba(99, 102, 241, 0.03) 0%,
+          rgba(236, 72, 153, 0.03) 100%
+        );
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 24px 32px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-shrink: 0;
+      }
+
+      .header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .header h1 {
+        font-size: 26px;
+        font-weight: 800;
+        margin: 0;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* 品牌标识圆点 */
+      .header h1::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        flex-shrink: 0;
+      }
+
+      .header-badge {
+        background: transparent;
+        color: var(--text-tertiary);
+        padding: 0;
+        border-radius: 0;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.3px;
+        text-transform: lowercase;
+        border: none;
+        width: fit-content;
+        opacity: 0.5;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-top: 4px;
+      }
+
+      .header-stats {
+        text-align: center;
+        background: white;
+        padding: 10px 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-subtle);
+      }
+
+      .header-stats .count {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--primary-color);
+        letter-spacing: -0.02em;
+      }
+
+      .header-stats .label {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        margin-top: 2px;
+        letter-spacing: 0.3px;
+      }
+
+      /* 内容区域 */
+      .content {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* 侧边栏 - Bento风格 */
+      .sidebar {
+        width: 240px;
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border-subtle);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        padding: 18px 16px 16px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .btn {
+        width: 100%;
+        padding: 11px 16px;
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* 现代柔和按钮设计 */
+      .btn-primary {
+        background: white;
+        color: var(--text-primary);
+        border: 1.5px solid var(--border-color);
+        box-shadow: var(--shadow-subtle);
+      }
+
+      .btn-primary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(99, 102, 241, 0.04) 0%,
+          rgba(236, 72, 153, 0.04) 100%
+        );
+        opacity: 0;
+        transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .btn-primary:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        transform: translateY(-1px);
+        box-shadow:
+          var(--shadow-soft),
+          0 0 0 3px rgba(99, 102, 241, 0.08);
+      }
+
+      .btn-primary:hover::before {
+        opacity: 1;
+      }
+
+      .btn-primary:active {
+        transform: translateY(0);
+        transition-duration: 0.1s;
+        box-shadow: var(--shadow-subtle);
+      }
+
+      .btn-danger {
+        background: var(--danger-color);
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .notes-list {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 14px 10px;
+      }
+
+      /* 笔记列表过渡动画 */
+      .note-list-enter-active {
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .note-list-leave-active {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .note-list-enter-from {
+        opacity: 0;
+        transform: translateY(-12px) scale(0.95);
+      }
+
+      .note-list-leave-to {
+        opacity: 0;
+        transform: translateX(-12px) scale(0.95);
+      }
+
+      .note-list-move {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Bento卡片设计 */
+      .note-item {
+        background: white;
+        border: 1px solid var(--border-color);
+        /* 不规则圆角 */
+        border-radius: var(--radius-lg) var(--radius-md) var(--radius-lg) var(--radius-md);
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        /* 优化过渡 - 分开定义避免抖动 */
+        transition:
+          background 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+          border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+          box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+          transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        /* 确保布局稳定 */
+        will-change: transform;
+      }
+
+      /* 卡片的微妙渐变背景 */
+      .note-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, transparent 0%, rgba(99, 102, 241, 0.02) 100%);
+        opacity: 0;
+        transition: opacity 0.25s;
+      }
+
+      .note-item:hover::before {
+        opacity: 1;
+      }
+
+      .note-item:hover {
+        border-color: var(--primary-light);
+        box-shadow: var(--shadow-soft);
+        transform: translateX(4px);
+      }
+
+      .note-item.active {
+        border-color: var(--primary-color);
+        background: linear-gradient(
+          135deg,
+          rgba(99, 102, 241, 0.05) 0%,
+          rgba(236, 72, 153, 0.03) 100%
+        );
+        box-shadow:
+          var(--shadow-soft),
+          0 0 0 1px rgba(99, 102, 241, 0.1) inset;
+      }
+
+      .note-item.active::before {
+        opacity: 1;
+      }
+
+      .note-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .note-item-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 13px;
+        line-height: 1.4;
+        letter-spacing: -0.01em;
+        flex: 1;
+        margin-right: 10px;
+      }
+
+      .note-item-time {
+        font-size: 10px;
+        color: var(--text-tertiary);
+        font-weight: 500;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        background: var(--bg-tertiary);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+
+      .note-item-preview {
+        font-size: 12px;
+        color: var(--text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1.5;
+        position: relative;
+        z-index: 1;
+      }
+
+      .note-item-empty {
+        color: var(--text-tertiary);
+        font-style: italic;
+      }
+
+      /* 编辑器区域 */
+      .editor-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        position: relative;
+        min-height: 0; /* 确保 flex 子元素正确收缩 */
+      }
+
+      /* 编辑器包裹层 - 用于过渡动画 */
+      .editor-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      /* Vue过渡动画 - 淡入淡出 + 轻微位移 */
+      .editor-fade-enter-active,
+      .editor-fade-leave-active {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .editor-fade-enter-from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      .editor-fade-leave-to {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      .editor-fade-enter-to,
+      .editor-fade-leave-from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .editor-header {
+        padding: 20px 32px 16px;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(99, 102, 241, 0.01) 100%
+        );
+      }
+
+      .editor-title-input {
+        flex: 1;
+        border: none;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+        outline: none;
+        padding: 6px 0;
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+      }
+
+      .editor-title-input::placeholder {
+        color: var(--text-light);
+      }
+
+      .editor-actions {
+        display: flex;
+        gap: 10px;
+        margin-left: 20px;
+        align-items: center;
+      }
+
+      .btn-small {
+        padding: 8px 14px;
+        font-size: 13px;
+        border-radius: var(--radius-md);
+        border: none;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .btn-outline {
+        background: white;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        box-shadow: var(--shadow-subtle);
+      }
+
+      .btn-outline:hover {
+        border-color: var(--danger-color);
+        color: var(--danger-color);
+        box-shadow: var(--shadow-soft);
+        transform: translateY(-1px);
+      }
+
+      .btn-outline:active {
+        transform: translateY(0);
+      }
+
+      /* 保存状态指示器 */
+      .save-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-tertiary);
+        padding: 6px 12px;
+        border-radius: var(--radius-md);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-subtle);
+        font-weight: 500;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+      }
+
+      .save-indicator span:first-child {
+        font-size: 8px;
+        line-height: 1;
+      }
+
+      .save-indicator.pending {
+        background: rgba(236, 72, 153, 0.05);
+        color: var(--text-secondary);
+        border-color: rgba(236, 72, 153, 0.1);
+      }
+
+      .save-indicator.pending span:first-child {
+        color: var(--accent-color);
+      }
+
+      .save-indicator.saving {
+        background: rgba(99, 102, 241, 0.05);
+        color: var(--text-secondary);
+        border-color: rgba(99, 102, 241, 0.1);
+      }
+
+      .save-indicator.saving span:first-child {
+        color: var(--primary-color);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .save-indicator.saved {
+        background: rgba(16, 185, 129, 0.05);
+        color: var(--text-secondary);
+        border-color: rgba(16, 185, 129, 0.1);
+      }
+
+      .save-indicator.saved span:first-child {
+        color: var(--success-color);
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .editor-content {
+        flex: 1;
+        padding: 40px;
+        overflow-y: auto;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(99, 102, 241, 0.005) 100%
+        );
+      }
+
+      .editor-textarea {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        resize: none;
+        font-size: 16px;
+        line-height: 1.75;
+        color: var(--text-primary);
+        font-family:
+          'SF Pro Text',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        letter-spacing: -0.01em;
+      }
+
+      .editor-textarea::placeholder {
+        color: var(--text-light);
+      }
+
+      /* 空状态 */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 60px 40px;
+        text-align: center;
+      }
+
+      .empty-state-icon {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 24px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* 几何图形 - 优雅的圆形轮廓 */
+      .empty-state-icon::before {
+        content: '';
+        width: 100%;
+        height: 100%;
+        border: 3px solid var(--border-color);
+        border-radius: 50%;
+        position: absolute;
+      }
+
+      .empty-state-icon::after {
+        content: '';
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+        border-radius: 50%;
+        opacity: 0.1;
+      }
+
+      .empty-state-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+        letter-spacing: -0.01em;
+      }
+
+      .empty-state-text {
+        font-size: 14px;
+        color: var(--text-tertiary);
+        line-height: 1.6;
+        max-width: 300px;
+      }
+
+      /* 优雅的滚动条 */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: var(--text-light);
+        border-radius: var(--radius-sm);
+        transition: background 0.2s;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-tertiary);
+      }
+
+      /* 动画系统 */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .fade-in {
+        animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .slide-in {
+        animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* 选择文本的样式 */
+      ::selection {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--text-primary);
+      }
+
+      /* 响应式 */
+      @media (max-width: 1024px) {
+        #app {
+          max-width: 100%;
+        }
+
+        .sidebar {
+          width: 220px;
+        }
+
+        .note-item {
+          padding: 10px 12px;
+        }
+
+        .header {
+          padding: 20px 28px 18px;
+        }
+
+        .header h1 {
+          font-size: 24px;
+          gap: 8px;
+        }
+
+        .header h1::before {
+          width: 9px;
+          height: 9px;
+        }
+
+        .header-stats {
+          padding: 8px 14px;
+        }
+
+        .header-stats .count {
+          font-size: 22px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 16px;
+        }
+
+        #app {
+          border-radius: var(--radius-lg);
+        }
+
+        .header {
+          padding: 18px 24px 16px;
+        }
+
+        .header h1 {
+          font-size: 22px;
+          gap: 8px;
+        }
+
+        .header h1::before {
+          width: 8px;
+          height: 8px;
+        }
+
+        .header-stats {
+          padding: 8px 12px;
+        }
+
+        .header-stats .count {
+          font-size: 20px;
+        }
+
+        .sidebar {
+          width: 200px;
+        }
+
+        .sidebar-header {
+          padding: 16px 14px 14px;
+        }
+
+        .btn {
+          padding: 10px 14px;
+          font-size: 13px;
+        }
+
+        .btn-primary {
+          border-width: 1px;
+        }
+
+        .notes-list {
+          padding: 12px 8px;
+        }
+
+        .note-item {
+          padding: 10px 12px;
+          margin-bottom: 7px;
+        }
+
+        .note-item-title {
+          font-size: 12px;
+        }
+
+        .note-item-preview {
+          font-size: 11px;
+        }
+
+        .editor-content {
+          padding: 28px 24px;
+        }
+
+        .editor-header {
+          padding: 16px 24px 14px;
+        }
+
+        .editor-title-input {
+          font-size: 20px;
+        }
+
+        .editor-actions {
+          margin-left: 16px;
+          gap: 8px;
+        }
+
+        .btn-small {
+          padding: 7px 12px;
+          font-size: 12px;
+        }
+
+        .save-indicator {
+          padding: 5px 10px;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 头部 -->
+      <div class="header">
+        <div class="header-left">
+          <h1>{{ pluginName }}</h1>
+          <span class="header-badge">v{{ version }}</span>
+        </div>
+        <div class="header-right">
+          <div class="header-stats">
+            <div class="count">{{ notes.length }}</div>
+            <div class="label">条笔记</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 内容区域 -->
+      <div class="content">
+        <!-- 侧边栏 - 笔记列表 -->
+        <div class="sidebar">
+          <div class="sidebar-header">
+            <button class="btn btn-primary" @click="createNote">
+              <span style="font-size: 16px; font-weight: 400">+</span>
+              <span>新建笔记</span>
+            </button>
+          </div>
+
+          <div class="notes-list">
+            <!-- 使用 TransitionGroup 为列表项添加过渡动画 -->
+            <transition-group name="note-list">
+              <div
+                v-for="note in sortedNotes"
+                :key="note.id"
+                :class="['note-item', { active: currentNote && currentNote.id === note.id }]"
+                @click="selectNote(note)"
+              >
+                <div class="note-item-header">
+                  <div class="note-item-title">{{ note.title || '无标题' }}</div>
+                  <div class="note-item-time">{{ formatTime(note.updatedAt) }}</div>
+                </div>
+                <div :class="['note-item-preview', { 'note-item-empty': !note.content }]">
+                  {{ note.content || '空笔记' }}
+                </div>
+              </div>
+            </transition-group>
+
+            <!-- 空状态 -->
+            <div v-if="notes.length === 0" class="empty-state">
+              <div class="empty-state-icon"></div>
+              <div class="empty-state-title">暂无笔记</div>
+              <div class="empty-state-text">点击上方按钮创建第一条笔记</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 编辑器 -->
+        <div class="editor-container">
+          <!-- 使用 Transition 包裹,mode="out-in" 确保旧内容离开后新内容才进入 -->
+          <transition name="editor-fade" mode="out-in">
+            <!-- 编辑器内容 - 使用 key 确保笔记切换时触发过渡 -->
+            <div v-if="currentNote" :key="currentNote.id" class="editor-wrapper">
+              <div class="editor-header">
+                <input
+                  v-model="currentNote.title"
+                  class="editor-title-input"
+                  placeholder="笔记标题..."
+                  @input="onContentChange"
+                />
+                <div class="editor-actions">
+                  <div :class="['save-indicator', saveStatus]">
+                    <span v-if="saveStatus === 'saving'">●</span>
+                    <span v-else-if="saveStatus === 'saved'">●</span>
+                    <span v-else>●</span>
+                    <span v-if="saveStatus === 'saving'">保存中</span>
+                    <span v-else-if="saveStatus === 'saved'">已保存</span>
+                    <span v-else>待保存</span>
+                  </div>
+                  <button class="btn-small btn-outline" @click="deleteCurrentNote">
+                    <span style="font-size: 14px; font-weight: 400">×</span>
+                    <span>删除</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="editor-content">
+                <textarea
+                  v-model="currentNote.content"
+                  class="editor-textarea"
+                  placeholder="开始写点什么吧..."
+                  @input="onContentChange"
+                  @blur="saveNotes"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- 未选择笔记的空状态 -->
+            <div v-else key="empty" class="empty-state">
+              <div class="empty-state-icon"></div>
+              <div class="empty-state-title">选择或创建一条笔记</div>
+              <div class="empty-state-text">在左侧选择一条笔记开始编辑,或创建一条新笔记</div>
+            </div>
+          </transition>
+        </div>
+      </div>
+    </div>
+
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script>
+      const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted } = Vue
+
+      createApp({
+        setup() {
+          // 状态
+          const pluginId = ref('')
+          const pluginName = ref('随手记')
+          const version = ref('1.0.0')
+          const notes = ref([])
+          const currentNote = ref(null)
+          const saveStatus = ref('saved') // 'saved' | 'saving' | 'pending'
+          let saveTimer = null
+          let isSaving = false // 防止并发保存
+          let isSwitching = false // 防止快速切换笔记导致抖动
+
+          // 计算属性 - 按更新时间排序的笔记
+          const sortedNotes = computed(() => {
+            return [...notes.value].sort((a, b) => b.updatedAt - a.updatedAt)
+          })
+
+          // 生命周期
+          onMounted(async () => {
+            // 获取插件信息
+            if (window.pluginData) {
+              pluginId.value = window.pluginData.pluginId
+              pluginName.value = window.pluginData.pluginName || '随手记'
+              version.value = window.pluginData.version || '1.0.0'
+            }
+
+            // 加载笔记
+            await loadNotes()
+
+            // 如果有笔记,选择第一条
+            if (notes.value.length > 0) {
+              currentNote.value = notes.value[0]
+            } else {
+              // 没有笔记,创建一条
+              createNote()
+            }
+
+            // 监听窗口关闭前事件
+            window.addEventListener('beforeunload', handleBeforeUnload)
+
+            console.log('✅ 随手记已加载,共', notes.value.length, '条笔记')
+          })
+
+          onUnmounted(() => {
+            // 清理
+            if (saveTimer) {
+              clearTimeout(saveTimer)
+            }
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+
+            // 确保最后保存一次
+            saveNotes()
+          })
+
+          // 方法
+
+          /**
+           * 从主进程加载笔记
+           */
+          async function loadNotes() {
+            try {
+              if (!window.api || !window.api.plugin) {
+                console.error('❌ IPC API 不可用')
+                notes.value = []
+                return
+              }
+
+              const result = await window.api.plugin.invoke(`${pluginId.value}:getNotes`)
+
+              if (result.success) {
+                notes.value = result.data || []
+                console.log('📖 加载笔记:', notes.value.length, '条')
+              } else {
+                console.error('加载笔记失败:', result.error)
+                notes.value = []
+              }
+            } catch (error) {
+              console.error('加载笔记失败:', error)
+              notes.value = []
+            }
+          }
+
+          /**
+           * 保存笔记到主进程
+           */
+          async function saveNotes() {
+            // 防止并发保存
+            if (isSaving) {
+              console.log('⏳ 正在保存,跳过本次保存')
+              return
+            }
+
+            try {
+              isSaving = true
+              saveStatus.value = 'saving'
+
+              if (!window.api || !window.api.plugin) {
+                console.error('❌ IPC API 不可用')
+                saveStatus.value = 'saved'
+                return
+              }
+
+              // 深拷贝笔记数据,确保数据完整性
+              const notesToSave = JSON.parse(JSON.stringify(notes.value))
+
+              const result = await window.api.plugin.invoke(
+                `${pluginId.value}:saveNotes`,
+                notesToSave
+              )
+
+              if (result.success) {
+                saveStatus.value = 'saved'
+                console.log('💾 笔记已保存:', notes.value.length, '条')
+              } else {
+                console.error('保存笔记失败:', result.error)
+                saveStatus.value = 'saved'
+
+                // 显示错误提示
+                alert('保存失败: ' + result.error)
+              }
+            } catch (error) {
+              console.error('保存笔记失败:', error)
+              saveStatus.value = 'saved'
+
+              // 显示错误提示
+              alert('保存失败: ' + error.message)
+            } finally {
+              isSaving = false
+            }
+          }
+
+          /**
+           * 创建新笔记
+           */
+          function createNote() {
+            // 防止快速连续创建
+            if (isSwitching) {
+              console.log('⏳ 正在切换笔记,请稍候...')
+              return
+            }
+
+            isSwitching = true
+
+            const newNote = {
+              id: generateId(),
+              title: '',
+              content: '',
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }
+
+            notes.value.unshift(newNote)
+
+            // 使用 requestAnimationFrame 确保平滑切换
+            requestAnimationFrame(() => {
+              currentNote.value = newNote
+
+              // 立即保存
+              saveNotes()
+
+              console.log('➕ 创建新笔记:', newNote.id)
+
+              // 过渡动画完成后解除锁定
+              setTimeout(() => {
+                isSwitching = false
+              }, 350)
+            })
+          }
+
+          /**
+           * 选择笔记
+           */
+          function selectNote(note) {
+            // 防止快速切换导致抖动
+            if (isSwitching) {
+              console.log('⏳ 正在切换笔记,请稍候...')
+              return
+            }
+
+            // 如果是同一条笔记,直接返回
+            if (currentNote.value && currentNote.value.id === note.id) {
+              return
+            }
+
+            isSwitching = true
+
+            // 先保存当前笔记
+            if (currentNote.value) {
+              saveNotes()
+            }
+
+            // 使用 requestAnimationFrame 确保平滑切换
+            requestAnimationFrame(() => {
+              currentNote.value = note
+              console.log('📝 选择笔记:', note.id)
+
+              // 过渡动画完成后解除锁定(300ms 是过渡时间)
+              setTimeout(() => {
+                isSwitching = false
+              }, 350)
+            })
+          }
+
+          /**
+           * 删除当前笔记
+           */
+          function deleteCurrentNote() {
+            if (!currentNote.value) return
+
+            if (notes.value.length === 1) {
+              // 最后一条笔记,清空内容而不是删除
+              currentNote.value.title = ''
+              currentNote.value.content = ''
+              currentNote.value.updatedAt = Date.now()
+              saveNotes()
+              return
+            }
+
+            const index = notes.value.findIndex((n) => n.id === currentNote.value.id)
+            if (index !== -1) {
+              notes.value.splice(index, 1)
+
+              // 选择下一条笔记
+              if (notes.value.length > 0) {
+                currentNote.value = notes.value[0]
+              } else {
+                currentNote.value = null
+              }
+
+              saveNotes()
+              console.log('🗑️ 删除笔记')
+            }
+          }
+
+          /**
+           * 内容变化时触发(防抖保存)
+           */
+          function onContentChange() {
+            saveStatus.value = 'pending'
+
+            if (currentNote.value) {
+              currentNote.value.updatedAt = Date.now()
+            }
+
+            // 清除之前的定时器
+            if (saveTimer) {
+              clearTimeout(saveTimer)
+            }
+
+            // 300ms 后自动保存
+            saveTimer = setTimeout(() => {
+              saveNotes()
+            }, 300)
+          }
+
+          /**
+           * 窗口关闭前保存
+           */
+          function handleBeforeUnload(event) {
+            saveNotes()
+          }
+
+          /**
+           * 生成唯一 ID
+           */
+          function generateId() {
+            return `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          }
+
+          /**
+           * 格式化时间
+           */
+          function formatTime(timestamp) {
+            const now = Date.now()
+            const diff = now - timestamp
+
+            // 1分钟内
+            if (diff < 60 * 1000) {
+              return '刚刚'
+            }
+
+            // 1小时内
+            if (diff < 60 * 60 * 1000) {
+              const minutes = Math.floor(diff / (60 * 1000))
+              return `${minutes}分钟前`
+            }
+
+            // 今天
+            const date = new Date(timestamp)
+            const today = new Date()
+            if (date.toDateString() === today.toDateString()) {
+              return date.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            }
+
+            // 昨天
+            const yesterday = new Date(today)
+            yesterday.setDate(yesterday.getDate() - 1)
+            if (date.toDateString() === yesterday.toDateString()) {
+              return (
+                '昨天 ' +
+                date.toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              )
+            }
+
+            // 其他日期
+            return date.toLocaleDateString('zh-CN', {
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          }
+
+          // 返回
+          return {
+            pluginName,
+            version,
+            notes,
+            currentNote,
+            sortedNotes,
+            saveStatus,
+            createNote,
+            selectNote,
+            deleteCurrentNote,
+            onContentChange,
+            saveNotes,
+            formatTime
+          }
+        }
+      }).mount('#app')
+    </script>
+  </body>
+</html>
