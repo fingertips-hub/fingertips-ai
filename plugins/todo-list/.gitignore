@@ -1,0 +1,17 @@
+# 数据文件（用户数据）
+todos.json
+
+# Node modules（如果有依赖）
+node_modules/
+
+# 日志文件
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+

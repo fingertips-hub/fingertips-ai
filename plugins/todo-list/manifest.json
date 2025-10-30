@@ -1,0 +1,31 @@
+{
+  "id": "todo-list",
+  "name": "Todo List",
+  "version": "1.0.0",
+  "description": "一个功能完善、设计精美的待办事项管理插件",
+  "author": "Fingertips AI",
+  "icon": "mdi:checkbox-marked-circle-outline",
+  "keywords": ["todo", "task", "productivity", "管理"],
+  "license": "MIT",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+  "permissions": ["window", "notification"],
+
+  "config": {
+    "defaults": {
+      "theme": "gradient",
+      "showCompleted": true,
+      "autoSave": true,
+      "notifications": true
+    }
+  },
+
+  "lifecycle": {
+    "onLoad": false,
+    "onActivate": true
+  }
+}

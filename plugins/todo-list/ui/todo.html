@@ -1,0 +1,1869 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Todo List</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* 现代配色方案 - 柔和专业 */
+        --color-primary: #6366f1;
+        --color-primary-light: #818cf8;
+        --color-primary-dark: #4f46e5;
+        --color-bg: #fafbfc;
+        --color-surface: #ffffff;
+        --color-surface-hover: #f8f9fa;
+        --color-border: #e5e7eb;
+        --color-border-light: #f3f4f6;
+        --color-text: #1f2937;
+        --color-text-secondary: #6b7280;
+        --color-text-muted: #9ca3af;
+
+        /* 优先级颜色 - 柔和版本 */
+        --color-priority-high: #ef4444;
+        --color-priority-high-light: #fee2e2;
+        --color-priority-medium: #f59e0b;
+        --color-priority-medium-light: #fef3c7;
+        --color-priority-low: #10b981;
+        --color-priority-low-light: #d1fae5;
+
+        /* 阴影 */
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+        /* 间距系统 */
+        --space-1: 0.25rem;
+        --space-2: 0.5rem;
+        --space-3: 0.75rem;
+        --space-4: 1rem;
+        --space-5: 1.25rem;
+        --space-6: 1.5rem;
+        --space-8: 2rem;
+
+        /* 圆角 */
+        --radius-sm: 0.375rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+        --radius-xl: 1rem;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+          'Helvetica Neue', Arial, sans-serif;
+        background: var(--color-bg);
+        min-height: 100vh;
+        padding: var(--space-6);
+        overflow-x: hidden;
+        color: var(--color-text);
+        line-height: 1.6;
+      }
+
+      #app {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      /* 头部区域 - 紧凑优化 */
+      .header {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-5) var(--space-6);
+        margin-bottom: var(--space-4);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border-light);
+      }
+
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-5);
+      }
+
+      .header-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+      }
+
+      .header-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(
+          135deg,
+          var(--color-primary) 0%,
+          var(--color-primary-dark) 100%
+        );
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--color-text);
+        letter-spacing: -0.02em;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-4);
+        padding: var(--space-4) 0 0 0;
+        border-top: 1px solid var(--color-border-light);
+      }
+
+      .stat-item {
+        text-align: center;
+        position: relative;
+      }
+
+      .stat-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        right: calc(var(--space-4) / -2);
+        top: 50%;
+        transform: translateY(-50%);
+        width: 1px;
+        height: 24px;
+        background: var(--color-border-light);
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--color-primary);
+        margin-bottom: var(--space-1);
+        line-height: 1;
+        letter-spacing: -0.03em;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+
+      /* 过滤器和操作栏 - 极简设计 */
+      .filters {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-3) var(--space-4);
+        margin-bottom: var(--space-4);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border-light);
+        display: flex;
+        gap: var(--space-4);
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .filter-group {
+        display: flex;
+        gap: var(--space-2);
+        background: var(--color-bg);
+        padding: var(--space-1);
+        border-radius: var(--radius-lg);
+      }
+
+      .filter-btn {
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        background: transparent;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .filter-btn.active {
+        background: var(--color-primary);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .filter-btn:hover:not(.active) {
+        background: var(--color-surface-hover);
+        color: var(--color-text);
+      }
+
+      /* 搜索框和添加按钮组合 */
+      .search-and-add {
+        flex: 1;
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        min-width: 300px;
+      }
+
+      .search-box {
+        flex: 1;
+        min-width: 180px;
+        position: relative;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: var(--space-3) var(--space-4) var(--space-3) 36px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
+        color: var(--color-text);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .search-input::placeholder {
+        color: var(--color-text-muted);
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        background: var(--color-surface);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .search-icon {
+        position: absolute;
+        left: var(--space-3);
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--color-text-muted);
+        font-size: 16px;
+      }
+
+      /* 添加任务按钮 - 现代简约 */
+      .add-todo-btn {
+        padding: var(--space-3) var(--space-5);
+        background: var(--color-surface);
+        color: var(--color-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        box-shadow: var(--shadow-sm);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .add-todo-btn:hover {
+        background: var(--color-primary);
+        color: white;
+        border-color: var(--color-primary);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+
+      .add-todo-btn:active {
+        transform: translateY(0);
+      }
+
+      .add-icon {
+        font-size: 16px;
+      }
+
+      /* Dialog 弹窗样式 */
+      .add-dialog {
+        border: none;
+        border-radius: var(--radius-xl);
+        padding: 0;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: var(--shadow-xl);
+        background: transparent;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        margin: 0;
+      }
+
+      .add-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+      }
+
+      .dialog-content {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+      }
+
+      .dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-6);
+        border-bottom: 1px solid var(--color-border-light);
+      }
+
+      .dialog-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--color-text);
+        margin: 0;
+      }
+
+      .dialog-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: var(--color-bg);
+        color: var(--color-text-secondary);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .dialog-close:hover {
+        background: var(--color-priority-high);
+        color: white;
+      }
+
+      .dialog-body {
+        padding: var(--space-6);
+      }
+
+      .form-group {
+        margin-bottom: var(--space-5);
+      }
+
+      .form-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .form-label {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--color-text);
+        margin-bottom: var(--space-3);
+      }
+
+      .label-icon {
+        font-size: 14px;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+      }
+
+      .form-input {
+        width: 100%;
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--color-border);
+        background: var(--color-bg);
+        border-radius: var(--radius-lg);
+        font-size: 15px;
+        color: var(--color-text);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 400;
+      }
+
+      .form-input::placeholder {
+        color: var(--color-text-muted);
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        background: var(--color-surface);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .form-date {
+        cursor: pointer;
+      }
+
+      .form-textarea {
+        width: 100%;
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--color-border);
+        background: var(--color-bg);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
+        color: var(--color-text);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-family: inherit;
+        resize: vertical;
+        min-height: 80px;
+        line-height: 1.6;
+      }
+
+      .form-textarea::placeholder {
+        color: var(--color-text-muted);
+      }
+
+      .form-textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        background: var(--color-surface);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .priority-selector {
+        display: flex;
+        gap: var(--space-2);
+      }
+
+      .priority-btn {
+        flex: 1;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+      }
+
+      .priority-btn:hover:not(.active) {
+        background: var(--color-surface-hover);
+        border-color: var(--color-text-muted);
+      }
+
+      /* 高优先级按钮 */
+      .priority-btn.high {
+        color: var(--color-priority-high);
+      }
+
+      .priority-btn.high.active {
+        background: var(--color-priority-high);
+        border-color: var(--color-priority-high);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      /* 中优先级按钮 */
+      .priority-btn.medium {
+        color: var(--color-priority-medium);
+      }
+
+      .priority-btn.medium.active {
+        background: var(--color-priority-medium);
+        border-color: var(--color-priority-medium);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      /* 低优先级按钮 */
+      .priority-btn.low {
+        color: var(--color-priority-low);
+      }
+
+      .priority-btn.low.active {
+        background: var(--color-priority-low);
+        border-color: var(--color-priority-low);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .dialog-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3);
+        padding: var(--space-5) var(--space-6);
+        border-top: 1px solid var(--color-border-light);
+        background: var(--color-bg);
+      }
+
+      .dialog-btn {
+        padding: var(--space-3) var(--space-5);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .dialog-btn-cancel {
+        background: var(--color-surface);
+        color: var(--color-text-secondary);
+      }
+
+      .dialog-btn-cancel:hover {
+        background: var(--color-surface-hover);
+        border-color: var(--color-border);
+      }
+
+      .dialog-btn-primary {
+        background: var(--color-primary);
+        color: white;
+        border-color: var(--color-primary);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .dialog-btn-primary:hover:not(:disabled) {
+        background: var(--color-primary-dark);
+        box-shadow: var(--shadow-md);
+      }
+
+      .dialog-btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* 待办列表 - 精致卡片 */
+      .todo-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+      }
+
+      .todo-item {
+        background: var(--color-surface);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4) var(--space-5);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border-light);
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .todo-item:hover {
+        box-shadow: var(--shadow-md);
+        border-color: var(--color-border);
+      }
+
+      .todo-item.completed {
+        opacity: 0.6;
+        background: var(--color-bg);
+      }
+
+      /* 现代化 Checkbox */
+      .todo-checkbox {
+        width: 22px;
+        height: 22px;
+        border: 2px solid var(--color-border);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--color-surface);
+        position: relative;
+      }
+
+      .todo-checkbox:hover {
+        border-color: var(--color-primary);
+        background: rgba(99, 102, 241, 0.05);
+        transform: scale(1.1);
+      }
+
+      .todo-checkbox.checked {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-color: #6366f1;
+        animation: checkBounce 0.3s ease;
+      }
+
+      @keyframes checkBounce {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.2);
+        }
+      }
+
+      .todo-checkbox.checked::after {
+        content: '';
+        position: absolute;
+        width: 5px;
+        height: 10px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+        animation: checkMark 0.3s ease 0.1s both;
+      }
+
+      @keyframes checkMark {
+        0% {
+          height: 0;
+          width: 0;
+          opacity: 0;
+        }
+        20% {
+          height: 0;
+          width: 5px;
+          opacity: 1;
+        }
+        40% {
+          height: 10px;
+          width: 5px;
+          opacity: 1;
+        }
+        100% {
+          height: 10px;
+          width: 5px;
+          opacity: 1;
+        }
+      }
+
+      .priority-indicator {
+        width: 3px;
+        height: 32px;
+        border-radius: 99px;
+        flex-shrink: 0;
+      }
+
+      .priority-indicator.high {
+        background: var(--color-priority-high);
+      }
+
+      .priority-indicator.medium {
+        background: var(--color-priority-medium);
+      }
+
+      .priority-indicator.low {
+        background: var(--color-priority-low);
+      }
+
+      .todo-content {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .todo-text {
+        font-size: 15px;
+        color: var(--color-text);
+        margin-bottom: var(--space-2);
+        word-break: break-word;
+        line-height: 1.6;
+        font-weight: 400;
+      }
+
+      .todo-item.completed .todo-text {
+        text-decoration: line-through;
+        color: var(--color-text-muted);
+      }
+
+      /* 备注 - 紧凑单行设计 */
+      .todo-notes {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-bg);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        border-left: 2px solid var(--color-border);
+      }
+
+      .notes-icon {
+        font-size: 14px;
+        flex-shrink: 0;
+        opacity: 0.7;
+      }
+
+      .notes-text {
+        flex: 1;
+        font-style: italic;
+      }
+
+      .todo-item.completed .todo-notes {
+        opacity: 0.5;
+      }
+
+      /* 元信息行 - 所有标签在一行 */
+      .todo-meta {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+      }
+
+      /* 截止日期标签 - 紧凑inline设计 */
+      .due-date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: var(--radius-md);
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .badge-icon {
+        font-size: 11px;
+      }
+
+      /* 默认状态 - 灰色 */
+      .due-date-badge {
+        background: var(--color-bg);
+        color: var(--color-text-secondary);
+        border: 1px solid var(--color-border-light);
+      }
+
+      /* 已过期 - 红色 */
+      .due-date-badge.overdue {
+        background: rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.2);
+        color: #dc2626;
+      }
+
+      /* 今天到期 - 橙色 */
+      .due-date-badge.today {
+        background: rgba(251, 191, 36, 0.08);
+        border-color: rgba(251, 191, 36, 0.2);
+        color: #f59e0b;
+      }
+
+      /* 即将到期 - 蓝色 */
+      .due-date-badge.upcoming {
+        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.2);
+        color: var(--color-primary);
+      }
+
+      .create-time {
+        color: var(--color-text-muted);
+        font-size: 11px;
+      }
+
+      /* 优先级标签 - 现代化设计 */
+      .priority-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .priority-badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .priority-badge.high {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+      }
+
+      .priority-badge.high::before {
+        background: #dc2626;
+        box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+      }
+
+      .priority-badge.medium {
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+      }
+
+      .priority-badge.medium::before {
+        background: #6366f1;
+        box-shadow: 0 0 4px rgba(99, 102, 241, 0.4);
+      }
+
+      .priority-badge.low {
+        background: rgba(156, 163, 175, 0.1);
+        color: #6b7280;
+      }
+
+      .priority-badge.low::before {
+        background: #9ca3af;
+      }
+
+      .todo-actions {
+        display: flex;
+        gap: var(--space-2);
+        opacity: 0;
+        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .todo-item:hover .todo-actions {
+        opacity: 1;
+      }
+
+      /* 现代图标按钮 */
+      .action-btn {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: var(--color-text-secondary);
+        position: relative;
+      }
+
+      .action-btn:hover {
+        background: var(--color-bg);
+        transform: scale(1.1);
+      }
+
+      .action-btn.edit:hover {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--color-primary);
+      }
+
+      .action-btn.delete:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--color-danger);
+      }
+
+      /* SVG 图标样式 */
+      .action-btn svg {
+        width: 16px;
+        height: 16px;
+        stroke-width: 2;
+      }
+
+      /* Tooltip */
+      .action-btn::before {
+        content: attr(aria-label);
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%) scale(0);
+        padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        font-size: 11px;
+        border-radius: 4px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: all 0.2s;
+      }
+
+      .action-btn:hover::before {
+        transform: translateX(-50%) scale(1);
+        opacity: 1;
+      }
+
+      /* 空状态 - 优雅设计 */
+      .empty-state {
+        text-align: center;
+        padding: var(--space-8) var(--space-6);
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border-light);
+      }
+
+      .empty-icon {
+        font-size: 72px;
+        margin-bottom: var(--space-4);
+        opacity: 0.6;
+        filter: grayscale(0.2);
+      }
+
+      .empty-text {
+        font-size: 18px;
+        color: var(--color-text);
+        margin-bottom: var(--space-2);
+        font-weight: 600;
+      }
+
+      .empty-hint {
+        font-size: 14px;
+        color: var(--color-text-secondary);
+      }
+
+      /* 底部操作栏 - 简洁布局 */
+      .footer {
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-4) var(--space-5);
+        margin-top: var(--space-4);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border-light);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .footer-info {
+        font-size: 14px;
+        color: var(--color-text-secondary);
+        font-weight: 500;
+      }
+
+      .footer-actions {
+        display: flex;
+        gap: var(--space-3);
+      }
+
+      .footer-btn {
+        padding: var(--space-3) var(--space-5);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-priority-high);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .footer-btn:hover:not(:disabled) {
+        background: var(--color-priority-high);
+        border-color: var(--color-priority-high);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .footer-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* 编辑模式 - 清晰反馈 */
+      .edit-input {
+        width: 100%;
+        padding: var(--space-2) var(--space-4);
+        border: 2px solid var(--color-primary);
+        background: var(--color-surface);
+        border-radius: var(--radius-md);
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--color-text);
+      }
+
+      .edit-input:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      /* 加载状态 - 优雅动画 */
+      .loading {
+        text-align: center;
+        padding: var(--space-8);
+        color: var(--color-text-secondary);
+        font-size: 16px;
+        font-weight: 500;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        body {
+          padding: var(--space-4);
+        }
+
+        .header {
+          padding: var(--space-4) var(--space-5);
+        }
+
+        h1 {
+          font-size: 20px;
+        }
+
+        .header-icon {
+          width: 32px;
+          height: 32px;
+          font-size: 18px;
+        }
+
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+          gap: var(--space-3);
+        }
+
+        .stat-item:nth-child(2n)::after {
+          display: none;
+        }
+
+        .stat-value {
+          font-size: 20px;
+        }
+
+        .filters {
+          flex-direction: column;
+        }
+
+        .filter-group {
+          width: 100%;
+        }
+
+        .search-and-add {
+          width: 100%;
+          min-width: 0;
+          flex-direction: column;
+        }
+
+        .search-box {
+          width: 100%;
+        }
+
+        .add-todo-btn {
+          width: 100%;
+        }
+
+        .todo-item {
+          padding: var(--space-3) var(--space-4);
+        }
+
+        /* Dialog 移动端优化 */
+        .add-dialog {
+          max-width: 95%;
+          width: 95%;
+        }
+
+        .dialog-header,
+        .dialog-body,
+        .dialog-footer {
+          padding: var(--space-4);
+        }
+
+        .dialog-title {
+          font-size: 18px;
+        }
+
+        .priority-selector {
+          flex-direction: column;
+        }
+
+        .dialog-footer {
+          flex-direction: column-reverse;
+        }
+
+        .dialog-btn {
+          width: 100%;
+        }
+      }
+
+      /* 滚动条样式 - 精致 */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: var(--color-bg);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: var(--color-border);
+        border-radius: 99px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div v-if="loading" class="loading">加载中...</div>
+
+      <template v-else>
+        <!-- 头部 -->
+        <div class="header">
+          <div class="header-top">
+            <div class="header-title">
+              <div class="header-icon">✓</div>
+              <h1>{{ pluginName }}</h1>
+            </div>
+          </div>
+
+          <!-- 统计 -->
+          <div class="stats">
+            <div class="stat-item">
+              <div class="stat-value">{{ totalCount }}</div>
+              <div class="stat-label">总任务</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ activeCount }}</div>
+              <div class="stat-label">进行中</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ completedCount }}</div>
+              <div class="stat-label">已完成</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ completionRate }}%</div>
+              <div class="stat-label">完成率</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 过滤器和操作栏 -->
+        <div class="filters">
+          <div class="filter-group">
+            <button
+              v-for="filter in filters"
+              :key="filter.value"
+              :class="['filter-btn', { active: currentFilter === filter.value }]"
+              @click="currentFilter = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+
+          <div class="search-and-add">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input
+                type="text"
+                class="search-input"
+                v-model="searchQuery"
+                placeholder="搜索任务..."
+              />
+            </div>
+
+            <button class="add-todo-btn" @click="openAddDialog">
+              <span class="add-icon">➕</span>
+              <span>添加任务</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 任务Dialog（添加/编辑通用） -->
+        <dialog ref="todoDialog" class="add-dialog" @click="handleDialogClick">
+          <div class="dialog-content">
+            <div class="dialog-header">
+              <h2 class="dialog-title">{{ dialogMode === 'add' ? '添加新任务' : '编辑任务' }}</h2>
+              <button class="dialog-close" @click="closeTodoDialog" aria-label="关闭">✕</button>
+            </div>
+
+            <div class="dialog-body">
+              <div class="form-group">
+                <label class="form-label">任务内容 *</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  v-model="todoText"
+                  @keyup.enter="saveTodoFromDialog"
+                  placeholder="请输入任务内容..."
+                  ref="dialogInput"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">优先级</label>
+                <div class="priority-selector">
+                  <button
+                    v-for="p in priorities"
+                    :key="p.value"
+                    :class="['priority-btn', p.value, { active: todoPriority === p.value }]"
+                    @click="todoPriority = p.value"
+                  >
+                    <span>{{ p.icon }}</span>
+                    <span>{{ p.label }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">
+                    <span class="label-icon">📅</span>
+                    <span>截止日期</span>
+                  </label>
+                  <input
+                    type="date"
+                    class="form-input form-date"
+                    v-model="todoDueDate"
+                    :min="getTodayDate()"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  <span class="label-icon">📝</span>
+                  <span>备注</span>
+                </label>
+                <textarea
+                  class="form-textarea"
+                  v-model="todoNotes"
+                  placeholder="添加备注信息（可选）..."
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="dialog-footer">
+              <button class="dialog-btn dialog-btn-cancel" @click="closeTodoDialog">取消</button>
+              <button
+                class="dialog-btn dialog-btn-primary"
+                @click="saveTodoFromDialog"
+                :disabled="!todoText.trim()"
+              >
+                {{ dialogMode === 'add' ? '添加任务' : '保存修改' }}
+              </button>
+            </div>
+          </div>
+        </dialog>
+
+        <!-- 待办列表 -->
+        <div class="todo-list" v-if="filteredTodos.length > 0">
+          <div
+            v-for="todo in filteredTodos"
+            :key="todo.id"
+            :class="['todo-item', { completed: todo.completed }]"
+          >
+            <div
+              :class="['todo-checkbox', { checked: todo.completed }]"
+              @click="toggleTodo(todo.id)"
+            ></div>
+
+            <div :class="['priority-indicator', todo.priority]"></div>
+
+            <div class="todo-content">
+              <div class="todo-text">{{ todo.text }}</div>
+
+              <!-- 备注（如果有）-->
+              <div class="todo-notes" v-if="todo.notes">
+                <span class="notes-icon">💬</span>
+                <span class="notes-text">{{ todo.notes }}</span>
+              </div>
+
+              <!-- 元信息行：优先级 + 截止日期 + 创建时间 -->
+              <div class="todo-meta">
+                <span :class="['priority-badge', todo.priority]"
+                  >{{ getPriorityLabel(todo.priority) }}</span
+                >
+                <span
+                  v-if="todo.dueDate"
+                  :class="['due-date-badge', getDueDateClass(todo.dueDate, todo.completed)]"
+                >
+                  <span class="badge-icon">📅</span>
+                  <span>{{ formatDueDate(todo.dueDate) }}</span>
+                </span>
+                <span class="create-time">{{ formatDate(todo.createdAt) }}</span>
+              </div>
+            </div>
+
+            <div class="todo-actions">
+              <button class="action-btn edit" @click="openEditDialog(todo)" aria-label="编辑任务">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                  />
+                </svg>
+              </button>
+              <button class="action-btn delete" @click="deleteTodo(todo.id)" aria-label="删除任务">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div class="empty-state" v-else>
+          <div class="empty-icon">📝</div>
+          <div class="empty-text">{{ emptyMessage }}</div>
+          <div class="empty-hint">添加你的第一个任务开始吧！</div>
+        </div>
+
+        <!-- 底部 -->
+        <div class="footer" v-if="totalCount > 0">
+          <div class="footer-info">{{ filteredTodos.length }} 个任务</div>
+          <div class="footer-actions">
+            <button class="footer-btn" @click="clearCompleted" v-if="completedCount > 0">
+              🗑️ 清空已完成 ({{ completedCount }})
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script>
+      const { createApp, ref, computed, reactive, onMounted, nextTick, watch } = Vue
+
+      createApp({
+        setup() {
+          // 状态
+          const pluginId = ref('')
+          const pluginName = ref('Todo List')
+          const loading = ref(true)
+          const todos = ref([])
+          const currentFilter = ref('all')
+          const searchQuery = ref('')
+
+          // Dialog状态（添加/编辑通用）
+          const dialogMode = ref('add') // 'add' 或 'edit'
+          const editingTodoId = ref(null)
+          const todoText = ref('')
+          const todoPriority = ref('medium')
+          const todoDueDate = ref('')
+          const todoNotes = ref('')
+          const todoDialog = ref(null)
+          const dialogInput = ref(null)
+
+          let saveTimer = null
+          let isSaving = false // 防止并发保存
+
+          // 过滤器选项
+          const filters = [
+            { value: 'all', label: '全部' },
+            { value: 'active', label: '进行中' },
+            { value: 'completed', label: '已完成' }
+          ]
+
+          // 优先级选项
+          const priorities = [
+            { value: 'high', label: '高优先级', icon: '⚡' },
+            { value: 'medium', label: '中优先级', icon: '●' },
+            { value: 'low', label: '低优先级', icon: '○' }
+          ]
+
+          // 计算属性
+          const totalCount = computed(() => todos.value.length)
+
+          const activeCount = computed(() => todos.value.filter((t) => !t.completed).length)
+
+          const completedCount = computed(() => todos.value.filter((t) => t.completed).length)
+
+          const completionRate = computed(() => {
+            if (totalCount.value === 0) return 0
+            return Math.round((completedCount.value / totalCount.value) * 100)
+          })
+
+          const filteredTodos = computed(() => {
+            let result = todos.value
+
+            // 按状态过滤
+            if (currentFilter.value === 'active') {
+              result = result.filter((t) => !t.completed)
+            } else if (currentFilter.value === 'completed') {
+              result = result.filter((t) => t.completed)
+            }
+
+            // 搜索过滤
+            if (searchQuery.value.trim()) {
+              const query = searchQuery.value.toLowerCase()
+              result = result.filter((t) => t.text.toLowerCase().includes(query))
+            }
+
+            return result
+          })
+
+          const emptyMessage = computed(() => {
+            if (searchQuery.value.trim()) {
+              return '没有找到匹配的任务'
+            }
+            if (currentFilter.value === 'active') {
+              return '没有进行中的任务'
+            }
+            if (currentFilter.value === 'completed') {
+              return '还没有完成的任务'
+            }
+            return '还没有任务'
+          })
+
+          // 生命周期
+          onMounted(async () => {
+            await loadData()
+
+            // 数据加载完成后，设置 watch 监听后续变化（防抖保存）
+            watch(
+              todos,
+              () => {
+                // 清除之前的定时器
+                if (saveTimer) {
+                  clearTimeout(saveTimer)
+                }
+
+                // 300ms 后自动保存
+                saveTimer = setTimeout(() => {
+                  saveTodos()
+                }, 300)
+              },
+              { deep: true }
+            )
+
+            // 监听窗口关闭前事件
+            window.addEventListener('beforeunload', handleBeforeUnload)
+
+            console.log('✅ Todo List 已加载')
+          })
+
+          // 方法
+          async function loadData() {
+            loading.value = true
+            try {
+              console.log('🔄 开始加载数据...')
+
+              // 获取插件信息
+              if (window.pluginData) {
+                pluginId.value = window.pluginData.pluginId
+                pluginName.value = window.pluginData.pluginName || 'Todo List'
+              }
+
+              // 从主进程加载任务
+              if (!window.api || !window.api.plugin) {
+                console.error('❌ IPC API 不可用')
+                todos.value = []
+                return
+              }
+
+              const result = await window.api.plugin.invoke(`${pluginId.value}:getTodos`)
+
+              if (result.success) {
+                todos.value = result.data || []
+                console.log(`✅ 从主进程加载了 ${todos.value.length} 个任务`)
+                if (todos.value.length > 0) {
+                  console.log('任务列表:', todos.value.map((t) => t.text).join(', '))
+                }
+              } else {
+                console.error('❌ 加载任务失败:', result.error)
+                todos.value = []
+              }
+            } catch (error) {
+              console.error('❌ 加载数据失败:', error)
+              todos.value = []
+            } finally {
+              loading.value = false
+              console.log('✅ 数据加载完成')
+            }
+          }
+
+          /**
+           * 保存任务到主进程
+           */
+          async function saveTodos() {
+            // 防止并发保存
+            if (isSaving) {
+              console.log('⏳ 正在保存，跳过本次保存')
+              return
+            }
+
+            try {
+              isSaving = true
+
+              if (!window.api || !window.api.plugin) {
+                console.error('❌ IPC API 不可用')
+                return
+              }
+
+              // 深拷贝任务数据，确保数据完整性
+              const todosToSave = JSON.parse(JSON.stringify(todos.value))
+
+              const result = await window.api.plugin.invoke(
+                `${pluginId.value}:saveTodos`,
+                todosToSave
+              )
+
+              if (result.success) {
+                console.log(`💾 任务已保存: ${todos.value.length} 条`)
+              } else {
+                console.error('❌ 保存任务失败:', result.error)
+                alert('保存失败: ' + result.error)
+              }
+            } catch (error) {
+              console.error('❌ 保存任务失败:', error)
+              alert('保存失败: ' + error.message)
+            } finally {
+              isSaving = false
+            }
+          }
+
+          /**
+           * 窗口关闭前保存
+           */
+          function handleBeforeUnload(event) {
+            saveTodos()
+          }
+
+          async function toggleTodo(todoId) {
+            try {
+              const todo = todos.value.find((t) => t.id === todoId)
+              if (!todo) return
+
+              // 切换状态
+              todo.completed = !todo.completed
+              todo.updatedAt = new Date().toISOString()
+
+              // 发送通知
+              if (window.api && window.api.plugin) {
+                try {
+                  await window.api.plugin.invoke('todo-list:notifyTaskToggled', {
+                    text: todo.text,
+                    completed: todo.completed
+                  })
+                } catch (notifyError) {
+                  console.warn('发送通知失败:', notifyError)
+                }
+              }
+            } catch (error) {
+              console.error('切换任务状态失败:', error)
+            }
+          }
+
+          async function deleteTodo(todoId) {
+            if (!confirm('确定要删除这个任务吗？')) return
+
+            try {
+              // 直接从列表中删除（会自动触发 watch 保存）
+              todos.value = todos.value.filter((t) => t.id !== todoId)
+            } catch (error) {
+              console.error('删除任务失败:', error)
+            }
+          }
+
+          async function clearCompleted() {
+            const count = completedCount.value
+            if (!confirm(`确定要清空 ${count} 个已完成的任务吗？`)) return
+
+            try {
+              // 过滤掉已完成的任务（会自动触发 watch 保存）
+              todos.value = todos.value.filter((t) => !t.completed)
+
+              // 发送通知
+              if (window.api && window.api.plugin) {
+                try {
+                  await window.api.plugin.invoke('todo-list:notifyCleared', count)
+                } catch (notifyError) {
+                  console.warn('发送通知失败:', notifyError)
+                }
+              }
+            } catch (error) {
+              console.error('清空已完成任务失败:', error)
+            }
+          }
+
+          /**
+           * 打开添加任务Dialog
+           */
+          function openAddDialog() {
+            dialogMode.value = 'add'
+            editingTodoId.value = null
+            todoText.value = ''
+            todoPriority.value = 'medium'
+            todoDueDate.value = ''
+            todoNotes.value = ''
+
+            if (todoDialog.value) {
+              todoDialog.value.showModal()
+              nextTick(() => {
+                if (dialogInput.value) {
+                  dialogInput.value.focus()
+                }
+              })
+            }
+          }
+
+          /**
+           * 打开编辑任务Dialog
+           */
+          function openEditDialog(todo) {
+            dialogMode.value = 'edit'
+            editingTodoId.value = todo.id
+            todoText.value = todo.text
+            todoPriority.value = todo.priority
+            todoDueDate.value = todo.dueDate || ''
+            todoNotes.value = todo.notes || ''
+
+            if (todoDialog.value) {
+              todoDialog.value.showModal()
+              nextTick(() => {
+                if (dialogInput.value) {
+                  dialogInput.value.focus()
+                }
+              })
+            }
+          }
+
+          /**
+           * 关闭Dialog
+           */
+          function closeTodoDialog() {
+            if (todoDialog.value) {
+              todoDialog.value.close()
+            }
+            // 清空数据
+            editingTodoId.value = null
+            todoText.value = ''
+            todoPriority.value = 'medium'
+            todoDueDate.value = ''
+            todoNotes.value = ''
+          }
+
+          /**
+           * 处理Dialog点击事件（点击外部关闭）
+           */
+          function handleDialogClick(event) {
+            if (event.target === todoDialog.value) {
+              closeTodoDialog()
+            }
+          }
+
+          /**
+           * 从Dialog保存任务（添加或编辑）
+           */
+          async function saveTodoFromDialog() {
+            const text = todoText.value.trim()
+            if (!text) return
+
+            try {
+              if (dialogMode.value === 'add') {
+                // 添加新任务
+                const newTodo = {
+                  id: Date.now().toString(),
+                  text: text,
+                  completed: false,
+                  priority: todoPriority.value,
+                  dueDate: todoDueDate.value || null,
+                  notes: todoNotes.value.trim() || null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }
+
+                todos.value.push(newTodo)
+                console.log(`➕ 添加任务: ${text}`)
+
+                // 发送通知
+                if (window.api && window.api.plugin) {
+                  try {
+                    await window.api.plugin.invoke('todo-list:notifyTaskAdded', {
+                      text: newTodo.text
+                    })
+                  } catch (notifyError) {
+                    console.warn('⚠️  发送通知失败:', notifyError)
+                  }
+                }
+              } else {
+                // 编辑现有任务
+                const todo = todos.value.find((t) => t.id === editingTodoId.value)
+                if (!todo) return
+
+                todo.text = text
+                todo.priority = todoPriority.value
+                todo.dueDate = todoDueDate.value || null
+                todo.notes = todoNotes.value.trim() || null
+                todo.updatedAt = new Date().toISOString()
+
+                console.log(`📝 编辑任务: ${text}`)
+              }
+
+              // 关闭Dialog
+              closeTodoDialog()
+            } catch (error) {
+              console.error('❌ 保存任务失败:', error)
+              alert('保存任务失败: ' + error.message)
+            }
+          }
+
+          function getPriorityLabel(priority) {
+            const p = priorities.find((p) => p.value === priority)
+            return p ? p.label : ''
+          }
+
+          function formatDate(dateString) {
+            const date = new Date(dateString)
+            const now = new Date()
+            const diff = now - date
+
+            // 小于1分钟
+            if (diff < 60000) {
+              return '刚刚'
+            }
+
+            // 小于1小时
+            if (diff < 3600000) {
+              const minutes = Math.floor(diff / 60000)
+              return `${minutes} 分钟前`
+            }
+
+            // 小于1天
+            if (diff < 86400000) {
+              const hours = Math.floor(diff / 3600000)
+              return `${hours} 小时前`
+            }
+
+            // 小于7天
+            if (diff < 604800000) {
+              const days = Math.floor(diff / 86400000)
+              return `${days} 天前`
+            }
+
+            // 格式化日期
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+          }
+
+          /**
+           * 获取今天的日期（YYYY-MM-DD 格式）
+           */
+          function getTodayDate() {
+            const today = new Date()
+            return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+          }
+
+          /**
+           * 格式化截止日期
+           */
+          function formatDueDate(dateString) {
+            if (!dateString) return ''
+
+            const dueDate = new Date(dateString)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            dueDate.setHours(0, 0, 0, 0)
+
+            const diffTime = dueDate.getTime() - today.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+            if (diffDays < 0) {
+              return `已过期 ${Math.abs(diffDays)} 天`
+            } else if (diffDays === 0) {
+              return '今天到期'
+            } else if (diffDays === 1) {
+              return '明天到期'
+            } else if (diffDays <= 7) {
+              return `${diffDays} 天后到期`
+            } else {
+              const month = dueDate.getMonth() + 1
+              const day = dueDate.getDate()
+              return `${month}月${day}日到期`
+            }
+          }
+
+          /**
+           * 获取截止日期的CSS类名
+           */
+          function getDueDateClass(dateString, isCompleted) {
+            if (!dateString || isCompleted) return ''
+
+            const dueDate = new Date(dateString)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            dueDate.setHours(0, 0, 0, 0)
+
+            const diffTime = dueDate.getTime() - today.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+            if (diffDays < 0) {
+              return 'overdue' // 已过期
+            } else if (diffDays === 0) {
+              return 'today' // 今天
+            } else if (diffDays <= 3) {
+              return 'upcoming' // 即将到期
+            }
+            return ''
+          }
+
+          return {
+            pluginName,
+            loading,
+            todos,
+            currentFilter,
+            searchQuery,
+            dialogMode,
+            editingTodoId,
+            todoText,
+            todoPriority,
+            todoDueDate,
+            todoNotes,
+            todoDialog,
+            dialogInput,
+            filters,
+            priorities,
+            totalCount,
+            activeCount,
+            completedCount,
+            completionRate,
+            filteredTodos,
+            emptyMessage,
+            toggleTodo,
+            deleteTodo,
+            clearCompleted,
+            openAddDialog,
+            openEditDialog,
+            closeTodoDialog,
+            handleDialogClick,
+            saveTodoFromDialog,
+            getPriorityLabel,
+            formatDate,
+            getTodayDate,
+            formatDueDate,
+            getDueDateClass
+          }
+        }
+      }).mount('#app')
+    </script>
+  </body>
+</html>
