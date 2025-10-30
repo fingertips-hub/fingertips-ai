@@ -87,12 +87,22 @@ const lastMouseY = ref(0)
 // 固定状态
 const isPinned = ref(false)
 
+// 🔒 拖拽保护：防止面板刚显示时就被拖动
+const isDragProtected = ref(true) // 初始状态为保护中
+const dragProtectionTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
+
 /**
  * 处理鼠标按下事件
  */
 const handleMouseDown = (event: MouseEvent): void => {
   // 只响应左键
   if (event.button !== 0) return
+
+  // 🔒 拖拽保护期：如果处于保护期，不允许开始拖拽
+  if (isDragProtected.value) {
+    console.log('[SuperPanel] Drag is protected, ignoring mousedown')
+    return
+  }
 
   // 只有当点击的是最外层容器本身时才允许拖拽
   // 如果点击的是内部元素,则不触发拖拽
@@ -101,6 +111,8 @@ const handleMouseDown = (event: MouseEvent): void => {
   isDragging.value = true
   lastMouseX.value = event.screenX
   lastMouseY.value = event.screenY
+
+  console.log('[SuperPanel] Drag started at:', { x: event.screenX, y: event.screenY })
 
   // 防止文本选择
   event.preventDefault()
@@ -131,7 +143,36 @@ const handleMouseMove = (event: MouseEvent): void => {
  * 处理鼠标释放事件
  */
 const handleMouseUp = (): void => {
+  if (isDragging.value) {
+    console.log('[SuperPanel] Drag ended')
+  }
   isDragging.value = false
+}
+
+/**
+ * 🔒 重置拖拽状态并启动保护期
+ * 当面板显示时调用，防止面板刚显示就被意外拖动
+ */
+const resetDragStateAndProtect = (): void => {
+  // 立即重置所有拖拽相关状态
+  isDragging.value = false
+  lastMouseX.value = 0
+  lastMouseY.value = 0
+  isDragProtected.value = true
+
+  // 清除之前的保护超时
+  if (dragProtectionTimeout.value) {
+    clearTimeout(dragProtectionTimeout.value)
+  }
+
+  console.log('[SuperPanel] Drag protection activated for 200ms')
+
+  // 200ms 后解除保护，允许正常拖拽
+  // 这个时间足够让用户的鼠标移动稳定下来
+  dragProtectionTimeout.value = setTimeout(() => {
+    isDragProtected.value = false
+    console.log('[SuperPanel] Drag protection deactivated, dragging is now allowed')
+  }, 200)
 }
 
 const handleClose = (): void => {
@@ -149,10 +190,14 @@ const handleTogglePin = (): void => {
 
 /**
  * 处理重置固定状态事件
+ * 当面板通过快捷键显示时，主进程会发送此事件
  */
 const handleResetPinned = (): void => {
   isPinned.value = false
-  console.log('Pin state reset from IPC event')
+  console.log('[SuperPanel] Pin state reset from IPC event')
+
+  // 🔒 重要：面板显示时重置拖拽状态并启动保护期
+  resetDragStateAndProtect()
 }
 
 /**
@@ -209,6 +254,12 @@ onMounted(() => {
 onUnmounted(() => {
   window.electron.ipcRenderer.removeListener('super-panel:reset-pinned', handleResetPinned)
   window.removeEventListener('keydown', handleKeyDown)
+
+  // 🧹 清理拖拽保护超时
+  if (dragProtectionTimeout.value) {
+    clearTimeout(dragProtectionTimeout.value)
+    dragProtectionTimeout.value = null
+  }
 })
 </script>
 
