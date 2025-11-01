@@ -1,0 +1,22 @@
+{
+  "id": "built-in-clock",
+  "name": "时钟",
+  "version": "1.0.0",
+  "description": "显示当前时间，支持自定义格式",
+  "author": "Fingertips AI",
+  "type": "simple",
+  "category": "collapsed",
+  "config": {
+    "format": "HH:mm:ss",
+    "updateInterval": 1000
+  },
+  "template": {
+    "type": "text",
+    "content": "{{time}}"
+  },
+  "styles": {
+    "fontSize": "14px",
+    "fontWeight": "500",
+    "color": "rgba(0, 0, 0, 0.8)"
+  }
+}

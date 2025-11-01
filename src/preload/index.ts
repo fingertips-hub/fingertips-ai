@@ -94,7 +94,24 @@ const api = {
     getAIDefaultModel: () => ipcRenderer.invoke('settings:get-ai-default-model') as Promise<string>,
     // 设置默认 AI 模型
     setAIDefaultModel: (model: string) =>
-      ipcRenderer.invoke('settings:set-ai-default-model', model) as Promise<boolean>
+      ipcRenderer.invoke('settings:set-ai-default-model', model) as Promise<boolean>,
+    // 获取灵动岛启用状态
+    getDynamicIslandEnabled: () =>
+      ipcRenderer.invoke('settings:get-dynamic-island-enabled') as Promise<boolean>,
+    // 设置灵动岛启用状态
+    setDynamicIslandEnabled: (enabled: boolean) =>
+      ipcRenderer.invoke('settings:set-dynamic-island-enabled', enabled) as Promise<boolean>,
+    // 获取灵动岛组件配置
+    getDynamicIslandWidgets: () => ipcRenderer.invoke('settings:get-dynamic-island-widgets'),
+    // 设置灵动岛组件配置
+    setDynamicIslandWidgets: (config: any) =>
+      ipcRenderer.invoke('settings:set-dynamic-island-widgets', config) as Promise<boolean>,
+    // 获取灵动岛展开状态组件配置
+    getDynamicIslandExpandedWidgets: () =>
+      ipcRenderer.invoke('settings:get-dynamic-island-expanded-widgets'),
+    // 设置灵动岛展开状态组件配置
+    setDynamicIslandExpandedWidgets: (config: any) =>
+      ipcRenderer.invoke('settings:set-dynamic-island-expanded-widgets', config) as Promise<boolean>
   },
   // AI Shortcut Runner 相关API
   aiShortcutRunner: {
@@ -236,6 +253,33 @@ const api = {
       const fullChannel = `plugin:${channel}`
       return ipcRenderer.invoke(fullChannel, ...args)
     }
+  },
+  // Dynamic Island 相关API
+  dynamicIsland: {
+    // 展开灵动岛
+    expand: () => ipcRenderer.send('dynamic-island:expand'),
+    // 折叠灵动岛
+    collapse: () => ipcRenderer.send('dynamic-island:collapse'),
+    // 显示灵动岛
+    show: () => ipcRenderer.send('dynamic-island:show'),
+    // 隐藏灵动岛
+    hide: () => ipcRenderer.send('dynamic-island:hide'),
+    // 关闭灵动岛
+    close: () => ipcRenderer.send('dynamic-island:close'),
+    // 设置鼠标穿透状态
+    setIgnoreMouseEvents: (ignore: boolean) =>
+      ipcRenderer.send('dynamic-island:set-ignore-mouse-events', ignore)
+  },
+  // Dynamic Island Widget 相关API
+  dynamicIslandWidget: {
+    // 获取所有组件
+    getAll: () => ipcRenderer.invoke('dynamic-island-widget:get-all'),
+    // 获取单个组件
+    get: (widgetId: string) => ipcRenderer.invoke('dynamic-island-widget:get', widgetId),
+    // 获取组件数据
+    getData: (widgetId: string) => ipcRenderer.invoke('dynamic-island-widget:get-data', widgetId),
+    // 重新加载组件
+    reload: () => ipcRenderer.invoke('dynamic-island-widget:reload')
   }
 }
 

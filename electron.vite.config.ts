@@ -19,7 +19,8 @@ export default defineConfig({
           settings: resolve(__dirname, 'src/renderer/settings.html'),
           'super-panel': resolve(__dirname, 'src/renderer/super-panel.html'),
           'ai-shortcut-runner': resolve(__dirname, 'src/renderer/ai-shortcut-runner.html'),
-          'update-progress': resolve(__dirname, 'src/renderer/update-progress.html')
+          'update-progress': resolve(__dirname, 'src/renderer/update-progress.html'),
+          'dynamic-island': resolve(__dirname, 'src/renderer/dynamic-island.html')
         }
       }
     },

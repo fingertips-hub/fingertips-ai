@@ -1,0 +1,23 @@
+{
+  "id": "built-in-system-monitor",
+  "name": "系统监控",
+  "version": "1.0.0",
+  "description": "实时显示CPU、内存使用率和网络状态",
+  "author": "Fingertips AI",
+  "type": "simple",
+  "category": "collapsed",
+  "config": {
+    "updateInterval": 2000,
+    "format": "compact"
+  },
+  "template": {
+    "type": "text",
+    "content": "CPU {{cpu}}% | MEM {{memory}}% | {{network}}"
+  },
+  "styles": {
+    "fontSize": "13px",
+    "fontWeight": "600",
+    "color": "rgba(0, 0, 0, 0.8)",
+    "fontFamily": "monospace"
+  }
+}

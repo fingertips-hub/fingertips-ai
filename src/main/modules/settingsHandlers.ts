@@ -84,6 +84,64 @@ export function setupSettingsHandlers(): void {
     }
   })
 
+  // 获取灵动岛启用状态
+  ipcMain.handle('settings:get-dynamic-island-enabled', async () => {
+    return await getSetting('dynamicIslandEnabled')
+  })
+
+  // 设置灵动岛启用状态
+  ipcMain.handle('settings:set-dynamic-island-enabled', async (_event, enabled: boolean) => {
+    try {
+      await setSetting('dynamicIslandEnabled', enabled)
+      return true
+    } catch (error) {
+      console.error('Failed to set dynamic island enabled:', error)
+      return false
+    }
+  })
+
+  // 获取灵动岛组件配置
+  ipcMain.handle('settings:get-dynamic-island-widgets', async () => {
+    try {
+      return await getSetting('dynamicIslandWidgets')
+    } catch (error) {
+      console.error('Failed to get dynamic island widgets:', error)
+      return { left: null, center: null, right: null }
+    }
+  })
+
+  // 设置灵动岛组件配置
+  ipcMain.handle('settings:set-dynamic-island-widgets', async (_event, config) => {
+    try {
+      await setSetting('dynamicIslandWidgets', config)
+      return true
+    } catch (error) {
+      console.error('Failed to set dynamic island widgets:', error)
+      return false
+    }
+  })
+
+  // 获取灵动岛展开状态组件配置
+  ipcMain.handle('settings:get-dynamic-island-expanded-widgets', async () => {
+    try {
+      return await getSetting('dynamicIslandExpandedWidgets')
+    } catch (error) {
+      console.error('Failed to get dynamic island expanded widgets:', error)
+      return { widgets: [] }
+    }
+  })
+
+  // 设置灵动岛展开状态组件配置
+  ipcMain.handle('settings:set-dynamic-island-expanded-widgets', async (_event, config) => {
+    try {
+      await setSetting('dynamicIslandExpandedWidgets', config)
+      return true
+    } catch (error) {
+      console.error('Failed to set dynamic island expanded widgets:', error)
+      return false
+    }
+  })
+
   // 选择文件夹
   ipcMain.handle('settings:select-folder', async (_event, currentPath?: string) => {
     // 获取设置窗口作为父窗口，使对话框居中
@@ -214,6 +272,8 @@ export function cleanupSettingsHandlers(): void {
   ipcMain.removeHandler('settings:set-ai-base-url')
   ipcMain.removeHandler('settings:get-ai-api-key')
   ipcMain.removeHandler('settings:set-ai-api-key')
+  ipcMain.removeHandler('settings:get-dynamic-island-enabled')
+  ipcMain.removeHandler('settings:set-dynamic-island-enabled')
 }
 
 /**

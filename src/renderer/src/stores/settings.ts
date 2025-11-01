@@ -11,6 +11,7 @@ export interface AppSettings {
   storageDirectory: string // 文件存储目录
   autoLaunch: boolean // 开机自启动
   hotkey: string // 召唤 Super Panel 的快捷键
+  dynamicIslandEnabled: boolean // 启用灵动岛
 
   // AI 设置（只用于 UI 展示，不存储到 localStorage）
   aiBaseUrl: string // AI Base URL
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   storageDirectory: '', // 将在初始化时从主进程获取默认路径
   autoLaunch: false,
   hotkey: 'LongPress:Middle', // 默认快捷键：长按中键
+  dynamicIslandEnabled: false, // 默认不启用灵动岛
 
   // AI 设置（只是占位符）
   aiBaseUrl: '',
@@ -57,6 +59,8 @@ export const useSettingsStore = defineStore('settings', () => {
           settings.value.storageDirectory = data.storageDirectory
         if (data.autoLaunch !== undefined) settings.value.autoLaunch = data.autoLaunch
         if (data.hotkey !== undefined) settings.value.hotkey = data.hotkey
+        if (data.dynamicIslandEnabled !== undefined)
+          settings.value.dynamicIslandEnabled = data.dynamicIslandEnabled
       } else {
         // 首次运行，获取默认存储目录
         if (window.api?.settings?.getDefaultStorageDirectory) {
@@ -109,7 +113,8 @@ export const useSettingsStore = defineStore('settings', () => {
       const dataToSave = {
         storageDirectory: settings.value.storageDirectory,
         autoLaunch: settings.value.autoLaunch,
-        hotkey: settings.value.hotkey
+        hotkey: settings.value.hotkey,
+        dynamicIslandEnabled: settings.value.dynamicIslandEnabled
         // 不包含 aiBaseUrl 和 aiApiKey
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
@@ -255,6 +260,37 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
+   * 更新灵动岛启用状态
+   */
+  async function updateDynamicIslandEnabled(enabled: boolean): Promise<boolean> {
+    try {
+      if (!window.api?.settings?.setDynamicIslandEnabled) {
+        console.error('setDynamicIslandEnabled API not available')
+        return false
+      }
+
+      const success = await window.api.settings.setDynamicIslandEnabled(enabled)
+      if (success) {
+        settings.value.dynamicIslandEnabled = enabled
+        saveToStorage()
+
+        // 根据状态显示或隐藏灵动岛
+        if (enabled) {
+          window.api?.dynamicIsland?.show()
+        } else {
+          window.api?.dynamicIsland?.hide()
+        }
+
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Failed to update dynamic island enabled:', error)
+      return false
+    }
+  }
+
+  /**
    * 重置所有设置为默认值
    */
   async function resetToDefaults(): Promise<void> {
@@ -280,6 +316,7 @@ export const useSettingsStore = defineStore('settings', () => {
     updateHotkey,
     updateAIBaseUrl,
     updateAIApiKey,
+    updateDynamicIslandEnabled,
     resetToDefaults
   }
 })

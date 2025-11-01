@@ -57,6 +57,21 @@
             />
           </div>
         </div>
+
+        <!-- 启用灵动岛 -->
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <label class="settings-label">启用灵动岛</label>
+            <p class="settings-description">在屏幕顶部显示类似 iPhone 灵动岛的交互组件</p>
+          </div>
+          <div class="settings-item-control">
+            <Switch
+              v-model="dynamicIslandEnabled"
+              :disabled="dynamicIslandLoading"
+              @update:model-value="handleDynamicIslandChange"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- AI 设置组 -->
@@ -237,6 +252,8 @@ const autoLaunchLoading = ref(false)
 const hotkeyValue = ref('')
 const hotkeyLoading = ref(false)
 const hotkeyConflict = ref(false)
+const dynamicIslandEnabled = ref(false)
+const dynamicIslandLoading = ref(false)
 
 // 本地状态 - AI 设置
 const baseUrlValue = ref('')
@@ -327,6 +344,30 @@ async function handleHotkeyChange(value: string): Promise<void> {
     showToast('快捷键设置失败，请重试', 'error')
   } finally {
     hotkeyLoading.value = false
+  }
+}
+
+/**
+ * 处理灵动岛启用状态变更
+ */
+async function handleDynamicIslandChange(value: boolean): Promise<void> {
+  dynamicIslandLoading.value = true
+  try {
+    const success = await settingsStore.updateDynamicIslandEnabled(value)
+    if (success) {
+      dynamicIslandEnabled.value = value
+      showToast(value ? '灵动岛已启用' : '灵动岛已禁用')
+    } else {
+      // 恢复原值
+      dynamicIslandEnabled.value = !value
+      showToast('设置失败，请重试', 'error')
+    }
+  } catch (error) {
+    console.error('Failed to update dynamic island:', error)
+    dynamicIslandEnabled.value = !value
+    showToast('设置失败，请重试', 'error')
+  } finally {
+    dynamicIslandLoading.value = false
   }
 }
 
@@ -441,6 +482,7 @@ onMounted(async () => {
   // 初始化通用设置（从 store 读取）
   autoLaunchValue.value = settingsStore.settings.autoLaunch
   hotkeyValue.value = settingsStore.settings.hotkey
+  dynamicIslandEnabled.value = settingsStore.settings.dynamicIslandEnabled
 
   // 初始化 AI 设置（从主进程 electron-store 读取）
   if (window.api?.settings?.getAIBaseUrl) {

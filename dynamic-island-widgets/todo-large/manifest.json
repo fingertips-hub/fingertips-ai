@@ -1,0 +1,11 @@
+{
+  "id": "built-in-todo-large",
+  "name": "待办事项",
+  "version": "1.0.0",
+  "description": "管理每日待办事项，支持添加、完成、删除",
+  "author": "Fingertips AI",
+  "type": "advanced",
+  "category": "expanded",
+  "expandedSize": "large",
+  "expandedEntry": "widget.html"
+}

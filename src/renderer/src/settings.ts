@@ -6,6 +6,7 @@ import { createPinia } from 'pinia'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import Settings from './Settings.vue'
 import CommonSettings from './components/settings/CommonSettings.vue'
+import DynamicIslandSettings from './components/settings/DynamicIslandSettings.vue'
 import AISettings from './components/settings/AIShortcut.vue'
 import PluginManager from './components/settings/PluginManager.vue'
 
@@ -21,6 +22,11 @@ const router = createRouter({
       path: '/common',
       name: 'common',
       component: CommonSettings
+    },
+    {
+      path: '/dynamic-island',
+      name: 'dynamicIsland',
+      component: DynamicIslandSettings
     },
     {
       path: '/ai',

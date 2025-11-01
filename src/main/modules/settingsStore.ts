@@ -1,4 +1,32 @@
 /**
+ * 灵动岛折叠状态组件配置
+ */
+export interface DynamicIslandWidgetConfig {
+  left: string | null // 左侧组件 ID
+  center: string | null // 中间组件 ID
+  right: string | null // 右侧组件 ID
+}
+
+/**
+ * 灵动岛展开状态组件项
+ */
+export interface ExpandedWidgetItem {
+  widgetId: string // 组件 ID
+  row: number // 行位置（0 或 1）
+  col: number // 列位置（从 0 开始）
+  rowSpan: number // 跨行数（1 或 2）
+  colSpan: number // 跨列数（通常为 1）
+  enabled: boolean // 是否启用
+}
+
+/**
+ * 灵动岛展开状态组件配置
+ */
+export interface DynamicIslandExpandedConfig {
+  widgets: ExpandedWidgetItem[] // 组件列表（按顺序排列）
+}
+
+/**
  * 应用设置接口
  */
 export interface AppSettings {
@@ -6,6 +34,9 @@ export interface AppSettings {
   storageDirectory: string
   autoLaunch: boolean
   hotkey: string // 触发器：可以是快捷键或鼠标动作
+  dynamicIslandEnabled: boolean // 启用灵动岛
+  dynamicIslandWidgets: DynamicIslandWidgetConfig // 灵动岛折叠状态组件配置
+  dynamicIslandExpandedWidgets: DynamicIslandExpandedConfig // 灵动岛展开状态组件配置
 
   // AI 设置
   aiBaseUrl: string
@@ -21,6 +52,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   storageDirectory: '',
   autoLaunch: false,
   hotkey: 'LongPress:Middle', // 默认：长按中键
+  dynamicIslandEnabled: false, // 默认不启用灵动岛
+  dynamicIslandWidgets: {
+    left: null,
+    center: 'built-in-clock', // 默认中间显示时钟
+    right: null
+  },
+  dynamicIslandExpandedWidgets: {
+    widgets: [] // 默认展开状态无组件
+  },
 
   aiBaseUrl: 'https://api.openai.com/v1',
   aiApiKey: '',

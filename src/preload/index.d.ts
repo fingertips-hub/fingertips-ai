@@ -46,6 +46,38 @@ interface API {
     setAIModels: (models: string[]) => Promise<boolean>
     getAIDefaultModel: () => Promise<string>
     setAIDefaultModel: (model: string) => Promise<boolean>
+    getDynamicIslandEnabled: () => Promise<boolean>
+    setDynamicIslandEnabled: (enabled: boolean) => Promise<boolean>
+    getDynamicIslandWidgets: () => Promise<{
+      left: string | null
+      center: string | null
+      right: string | null
+    }>
+    setDynamicIslandWidgets: (config: {
+      left: string | null
+      center: string | null
+      right: string | null
+    }) => Promise<boolean>
+    getDynamicIslandExpandedWidgets: () => Promise<{
+      widgets: Array<{
+        widgetId: string
+        row: number
+        col: number
+        rowSpan: number
+        colSpan: number
+        enabled: boolean
+      }>
+    }>
+    setDynamicIslandExpandedWidgets: (config: {
+      widgets: Array<{
+        widgetId: string
+        row: number
+        col: number
+        rowSpan: number
+        colSpan: number
+        enabled: boolean
+      }>
+    }) => Promise<boolean>
   }
   aiShortcutRunner: {
     open: (shortcutData: {
@@ -197,6 +229,20 @@ interface API {
       error?: string
     }>
     invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+  }
+  dynamicIsland: {
+    expand: () => void
+    collapse: () => void
+    show: () => void
+    hide: () => void
+    close: () => void
+    setIgnoreMouseEvents: (ignore: boolean) => void
+  }
+  dynamicIslandWidget: {
+    getAll: () => Promise<any[]>
+    get: (widgetId: string) => Promise<any>
+    getData: (widgetId: string) => Promise<any>
+    reload: () => Promise<{ success: boolean }>
   }
 }
 

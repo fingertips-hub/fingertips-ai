@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>日历</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100%;
+        height: 100%;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+      }
+
+      .calendar-container {
+        width: 100%;
+        height: 100%;
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        padding: 0;
+        flex-shrink: 0;
+      }
+
+      .calendar-header h3 {
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(0, 0, 0, 0.85);
+        letter-spacing: 0.2px;
+      }
+
+      .calendar-header .year {
+        font-size: 10px;
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.5);
+        margin-left: 3px;
+      }
+
+      .calendar-weekdays {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        margin-bottom: 2px;
+        flex-shrink: 0;
+      }
+
+      .calendar-weekday {
+        text-align: center;
+        font-size: 10px;
+        font-weight: 600;
+        color: rgba(0, 0, 0, 0.45);
+        padding: 1px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+      }
+
+      .calendar-days {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        gap: 1px;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .calendar-day {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.75);
+        border-radius: 4px;
+        transition: all 0.15s ease;
+        cursor: default;
+        position: relative;
+        line-height: 1.3;
+      }
+
+      .calendar-day.other-month {
+        color: rgba(0, 0, 0, 0.25);
+      }
+
+      .calendar-day.today {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(102, 126, 234, 0.3);
+      }
+
+      .calendar-day.weekend:not(.today) {
+        color: rgba(234, 88, 12, 0.85);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="calendar-container">
+      <div class="calendar-header">
+        <div>
+          <span id="month-name"></span>
+          <span class="year" id="year"></span>
+        </div>
+      </div>
+      <div class="calendar-weekdays">
+        <div class="calendar-weekday">日</div>
+        <div class="calendar-weekday">一</div>
+        <div class="calendar-weekday">二</div>
+        <div class="calendar-weekday">三</div>
+        <div class="calendar-weekday">四</div>
+        <div class="calendar-weekday">五</div>
+        <div class="calendar-weekday">六</div>
+      </div>
+      <div class="calendar-days" id="calendar-days"></div>
+    </div>
+
+    <script>
+      const monthNames = [
+        '一月',
+        '二月',
+        '三月',
+        '四月',
+        '五月',
+        '六月',
+        '七月',
+        '八月',
+        '九月',
+        '十月',
+        '十一月',
+        '十二月'
+      ]
+
+      function renderCalendar() {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth()
+        const today = now.getDate()
+
+        console.log('渲染日历:', { year, month, today })
+
+        // 设置标题
+        document.getElementById('month-name').textContent = monthNames[month]
+        document.getElementById('year').textContent = year + '年'
+
+        // 获取当月第一天和最后一天
+        const firstDay = new Date(year, month, 1)
+        const lastDay = new Date(year, month + 1, 0)
+        const firstDayOfWeek = firstDay.getDay()
+        const daysInMonth = lastDay.getDate()
+
+        console.log('日历信息:', { firstDayOfWeek, daysInMonth })
+
+        // 获取上个月的最后几天
+        const prevMonthLastDay = new Date(year, month, 0).getDate()
+
+        const calendarDays = document.getElementById('calendar-days')
+        calendarDays.innerHTML = ''
+
+        console.log(
+          '日历容器:',
+          calendarDays,
+          '父元素高度:',
+          calendarDays.parentElement?.offsetHeight
+        )
+
+        // 填充上个月的日期
+        for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+          const day = prevMonthLastDay - i
+          const dayElement = document.createElement('div')
+          dayElement.className = 'calendar-day other-month'
+          dayElement.textContent = day
+          calendarDays.appendChild(dayElement)
+        }
+
+        // 填充当月的日期
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dayElement = document.createElement('div')
+          dayElement.className = 'calendar-day'
+
+          // 计算星期几
+          const date = new Date(year, month, day)
+          const dayOfWeek = date.getDay()
+
+          // 标记周末
+          if (dayOfWeek === 0 || dayOfWeek === 6) {
+            dayElement.classList.add('weekend')
+          }
+
+          // 标记今天
+          if (day === today) {
+            dayElement.classList.add('today')
+          }
+
+          dayElement.textContent = day
+          calendarDays.appendChild(dayElement)
+        }
+
+        // 填充下个月的日期
+        const remainingDays = 42 - (firstDayOfWeek + daysInMonth) // 6行 × 7天
+        for (let day = 1; day <= remainingDays; day++) {
+          const dayElement = document.createElement('div')
+          dayElement.className = 'calendar-day other-month'
+          dayElement.textContent = day
+          calendarDays.appendChild(dayElement)
+        }
+
+        console.log('日期总数:', calendarDays.children.length, '日历容器尺寸:', {
+          width: calendarDays.offsetWidth,
+          height: calendarDays.offsetHeight,
+          scrollHeight: calendarDays.scrollHeight
+        })
+      }
+
+      // 初始化日历
+      renderCalendar()
+
+      // 每天午夜更新日历
+      setInterval(
+        () => {
+          renderCalendar()
+        },
+        60 * 60 * 1000
+      ) // 每小时检查一次
+    </script>
+  </body>
+</html>

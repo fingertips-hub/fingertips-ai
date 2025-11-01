@@ -31,6 +31,18 @@ import {
 import { pluginManager } from './modules/pluginManager'
 import { setupPluginHandlers, cleanupPluginHandlers } from './modules/pluginHandlers'
 import { initializeAutoUpdater } from './modules/autoUpdater'
+import {
+  createDynamicIslandWindow,
+  showDynamicIslandWindow,
+  closeDynamicIslandWindow
+} from './modules/dynamicIsland'
+import {
+  setupDynamicIslandHandlers,
+  cleanupDynamicIslandHandlers
+} from './modules/dynamicIslandHandlers'
+import { initializeWidgetManager } from './modules/dynamicIslandWidgetManager'
+import { setupWidgetHandlers, cleanupWidgetHandlers } from './modules/dynamicIslandWidgetHandlers'
+import { getSetting } from './modules/settingsStore'
 
 // =============================================================================
 // 单实例锁定 - Single Instance Lock
@@ -201,6 +213,17 @@ app.whenReady().then(() => {
   // Setup Plugin System
   setupPluginHandlers()
 
+  // Setup Dynamic Island System
+  setupDynamicIslandHandlers()
+
+  // Setup Dynamic Island Widget System
+  setupWidgetHandlers()
+
+  // Initialize Widget Manager (异步)
+  initializeWidgetManager().catch((error) => {
+    console.error('Failed to initialize widget manager:', error)
+  })
+
   // Initialize Plugin Manager (异步)
   pluginManager.initialize().catch((error) => {
     console.error('Failed to initialize plugin manager:', error)
@@ -210,6 +233,24 @@ app.whenReady().then(() => {
   initializeDefaultHotkey().catch((error) => {
     console.error('Failed to initialize default hotkey:', error)
   })
+
+  // Initialize Dynamic Island (异步，根据配置决定是否启用)
+  getSetting('dynamicIslandEnabled')
+    .then((enabled) => {
+      if (enabled) {
+        console.log('[DynamicIsland] Enabled in settings, creating window...')
+        createDynamicIslandWindow()
+        // 延迟一点时间再显示，确保窗口已完全加载
+        setTimeout(() => {
+          showDynamicIslandWindow()
+        }, 500)
+      } else {
+        console.log('[DynamicIsland] Disabled in settings')
+      }
+    })
+    .catch((error) => {
+      console.error('Failed to check dynamic island settings:', error)
+    })
 
   // Initialize Auto Updater (GitHub Releases)
   // 🚀 启动自动更新系统，延迟2秒后自动检查更新
@@ -354,6 +395,17 @@ app.on('before-quit', () => {
     console.log('[Cleanup] ✓ Plugin System cleaned up')
   } catch (error) {
     console.error('[Cleanup] ✗ Error cleaning up Plugin System:', error)
+  }
+
+  // Cleanup Dynamic Island System
+  try {
+    console.log('[Cleanup] Cleaning up Dynamic Island System...')
+    cleanupDynamicIslandHandlers()
+    cleanupWidgetHandlers()
+    closeDynamicIslandWindow()
+    console.log('[Cleanup] ✓ Dynamic Island System cleaned up')
+  } catch (error) {
+    console.error('[Cleanup] ✗ Error cleaning up Dynamic Island System:', error)
   }
 })
 

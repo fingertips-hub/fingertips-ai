@@ -1,0 +1,11 @@
+{
+  "id": "built-in-calendar",
+  "name": "日历",
+  "version": "1.0.0",
+  "description": "显示当月日历，高亮今日",
+  "author": "Fingertips AI",
+  "type": "advanced",
+  "category": "expanded",
+  "expandedSize": "small",
+  "expandedEntry": "widget.html"
+}

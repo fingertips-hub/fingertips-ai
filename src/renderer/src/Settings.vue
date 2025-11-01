@@ -42,6 +42,11 @@ const menuItems = [
     icon: 'mdi:cog'
   },
   {
+    path: '/dynamic-island',
+    label: '灵动岛',
+    icon: 'mdi:island'
+  },
+  {
     path: '/ai',
     label: 'AI快捷指令',
     icon: 'mdi:lightning-bolt'
