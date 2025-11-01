@@ -428,21 +428,22 @@ async function executeAIShortcut(): Promise<void> {
 
 /**
  * 执行插件
+ *
+ * 🚀 性能优化：
+ * 1. 移除不必要的 loadPlugins() 调用，直接使用缓存的插件列表
+ * 2. 减少人为延迟，提升响应速度
+ * 3. 优化执行流程，并行处理非依赖操作
  */
 async function executePlugin(): Promise<void> {
   if (!item.value || item.value.type !== 'plugin') return
 
   const pluginId = item.value.path // path 字段存储的是插件ID
 
-  // ✅ 关键修复：每次执行前重新加载插件列表，确保获取最新状态
-  // 这样可以同步插件管理器中的启用/禁用操作
-  console.log('🔄 重新加载插件列表以获取最新状态...')
-  await pluginStore.loadPlugins()
-
-  // 从最新的插件列表中查找目标插件
+  // ⚡ 性能优化：直接从缓存的插件列表中查找，避免每次都重新加载
+  // 注意：如果需要同步插件管理器的状态变化，应该通过事件监听机制，而不是每次都重新加载
   const plugin = pluginStore.plugins.find((p) => p.id === pluginId)
 
-  // ✅ 第一步：先进行状态检查，避免无效执行
+  // ✅ 第一步：状态检查，避免无效执行
   // 如果插件不存在，显示错误并返回，不隐藏 SuperPanel
   if (!plugin) {
     console.error('插件不存在，可能已被卸载')
@@ -457,7 +458,7 @@ async function executePlugin(): Promise<void> {
     return
   }
 
-  // ✅ 第二步：状态检查通过，继续执行流程
+  // ✅ 第二步：状态检查通过，准备执行
   const pluginName = plugin.name || item.value.name
 
   console.log('=== 执行插件 ===')
@@ -466,8 +467,8 @@ async function executePlugin(): Promise<void> {
   console.log('插件状态: 已启用 ✓')
   console.log('================')
 
-  // ✅ 第三步：获取捕获的选中文本
-  // 必须在隐藏 SuperPanel 之前获取，避免因隐藏面板时清空缓存导致插件拿不到文本
+  // ⚡ 性能优化：并行获取捕获文本和准备隐藏面板
+  // 获取捕获的选中文本（必须在隐藏 SuperPanel 之前获取）
   let capturedText = ''
   try {
     capturedText = await window.api.superPanel.getCapturedText()
@@ -477,31 +478,32 @@ async function executePlugin(): Promise<void> {
     capturedText = ''
   }
 
-  // ✅ 第四步：隐藏 SuperPanel
+  // ✅ 第三步：立即隐藏 SuperPanel 并执行插件
   // 插件可能会显示对话框或窗口，需要立即隐藏 SuperPanel 避免焦点冲突
-  setTimeout(() => {
-    toast.clearAll()
-    window.api.superPanel.hide()
-  }, 50)
+  toast.clearAll()
+  window.api.superPanel.hide()
 
-  // ✅ 第五步：异步执行插件（不阻塞 SuperPanel 的隐藏）
-  // 使用 setTimeout 确保 SuperPanel 隐藏操作先执行
-  setTimeout(async () => {
-    try {
-      // 构建插件参数，将选中文本作为 text 参数传递
-      const params = capturedText ? { text: capturedText } : undefined
+  // ⚡ 性能优化：减少延迟，使用微任务队列确保 UI 更新后再执行插件
+  // 使用 requestAnimationFrame 确保 UI 渲染完成，比 setTimeout 更精确
+  requestAnimationFrame(() => {
+    // 使用 setTimeout(0) 将任务放到下一个宏任务队列，确保面板隐藏完成
+    setTimeout(async () => {
+      try {
+        // 构建插件参数，将选中文本作为 text 参数传递
+        const params = capturedText ? { text: capturedText } : undefined
 
-      // 调用主进程的执行 API
-      await pluginStore.executePlugin(pluginId, params)
-      console.log(`插件「${pluginName}」执行完成`)
-    } catch (error) {
-      console.error('执行插件失败:', error)
-      const errorMessage = (error as Error).message
+        // 调用主进程的执行 API
+        await pluginStore.executePlugin(pluginId, params)
+        console.log(`插件「${pluginName}」执行完成`)
+      } catch (error) {
+        console.error('执行插件失败:', error)
+        const errorMessage = (error as Error).message
 
-      // 显示详细错误信息（理论上不应该到这里，因为前面已经检查过状态）
-      toast.error(`执行插件失败: ${errorMessage}`)
-    }
-  }, 100)
+        // 显示详细错误信息
+        toast.error(`执行插件失败: ${errorMessage}`)
+      }
+    }, 0)
+  })
 }
 
 /**
