@@ -8,122 +8,118 @@
       @mouseenter="handleMouseEnter"
       @mouseleave="handleMouseLeave"
     >
-      <!-- 折叠状态内容 -->
-      <transition name="fade">
-        <div v-if="!isExpanded" class="collapsed-content">
-          <!-- 左侧组件 -->
-          <div v-if="leftWidget" class="widget-slot widget-left" v-html="leftWidget"></div>
+      <!-- 折叠状态内容 - DOM 始终存在，用 CSS 类控制显示/隐藏，避免 DOM 操作阻塞动画 -->
+      <div class="collapsed-content" :class="{ hidden: isExpanded }">
+        <!-- 左侧组件 -->
+        <div v-if="leftWidget" class="widget-slot widget-left" v-html="leftWidget"></div>
 
-          <!-- 中间组件 -->
-          <div v-if="centerWidget" class="widget-slot widget-center" v-html="centerWidget"></div>
+        <!-- 中间组件 -->
+        <div v-if="centerWidget" class="widget-slot widget-center" v-html="centerWidget"></div>
 
-          <!-- 右侧组件 -->
-          <div v-if="rightWidget" class="widget-slot widget-right" v-html="rightWidget"></div>
+        <!-- 右侧组件 -->
+        <div v-if="rightWidget" class="widget-slot widget-right" v-html="rightWidget"></div>
 
-          <!-- 默认占位 -->
-          <div v-if="!leftWidget && !centerWidget && !rightWidget" class="widget-placeholder">
-            <div class="status-indicator"></div>
-            <span class="status-text">Fingertips AI</span>
+        <!-- 默认占位 -->
+        <div v-if="!leftWidget && !centerWidget && !rightWidget" class="widget-placeholder">
+          <div class="status-indicator"></div>
+          <span class="status-text">Fingertips AI</span>
+        </div>
+      </div>
+
+      <!-- 展开状态内容 - DOM 始终存在，用 CSS 类控制显示/隐藏，避免 DOM 操作阻塞动画 -->
+      <div class="expanded-content" :class="{ visible: isExpanded }">
+        <!-- 标题栏 -->
+        <div class="expanded-header">
+          <div class="expanded-title-group">
+            <h3 class="expanded-title">Dynamic Island</h3>
+          </div>
+          <div class="expanded-actions">
+            <button v-if="!isEditMode" class="edit-btn" title="编辑" @click.stop="toggleEditMode">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+            </button>
+            <button v-if="isEditMode" class="done-btn" title="完成" @click.stop="toggleEditMode">
+              完成
+            </button>
+            <button class="collapse-btn" title="收起" @click.stop="handleCollapse">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 15l7-7 7 7"
+                />
+              </svg>
+            </button>
           </div>
         </div>
-      </transition>
 
-      <!-- 展开状态内容 -->
-      <transition name="fade">
-        <div v-if="isExpanded" class="expanded-content">
-          <!-- 标题栏 -->
-          <div class="expanded-header">
-            <div class="expanded-title-group">
-              <h3 class="expanded-title">Dynamic Island</h3>
-            </div>
-            <div class="expanded-actions">
-              <button v-if="!isEditMode" class="edit-btn" title="编辑" @click.stop="toggleEditMode">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-              <button v-if="isEditMode" class="done-btn" title="完成" @click.stop="toggleEditMode">
-                完成
-              </button>
-              <button class="collapse-btn" title="收起" @click.stop="handleCollapse">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- 组件网格区域 -->
-          <div class="expanded-body">
+        <!-- 组件网格区域 -->
+        <div class="expanded-body">
+          <div
+            class="widget-grid"
+            :class="{ 'edit-mode': isEditMode }"
+            @dragover.prevent="handleGridDragOver"
+            @drop.prevent="handleGridDrop"
+          >
+            <!-- 渲染所有展开组件 -->
             <div
-              class="widget-grid"
-              :class="{ 'edit-mode': isEditMode }"
-              @dragover.prevent="handleGridDragOver"
-              @drop.prevent="handleGridDrop"
+              v-for="(widget, index) in expandedWidgets"
+              :key="widget.widgetId"
+              class="widget-card"
+              :class="[
+                `size-${widget.manifest?.expandedSize || 'small'}`,
+                {
+                  disabled: !widget.enabled,
+                  dragging: widget.isDragging
+                }
+              ]"
+              :style="getWidgetCardStyle(widget, index)"
+              :draggable="isEditMode"
+              @dragstart="handleDragStart($event, widget)"
+              @dragend="handleDragEnd"
             >
-              <!-- 渲染所有展开组件 -->
-              <div
-                v-for="(widget, index) in expandedWidgets"
-                :key="widget.widgetId"
-                class="widget-card"
-                :class="[
-                  `size-${widget.manifest?.expandedSize || 'small'}`,
-                  {
-                    disabled: !widget.enabled,
-                    dragging: widget.isDragging
-                  }
-                ]"
-                :style="getWidgetCardStyle(widget, index)"
-                :draggable="isEditMode"
-                @dragstart="handleDragStart($event, widget)"
-                @dragend="handleDragEnd"
+              <!-- 删除按钮（编辑模式） -->
+              <button
+                v-if="isEditMode"
+                class="widget-delete-btn"
+                @click.stop="handleDeleteWidget(widget)"
               >
-                <!-- 删除按钮（编辑模式） -->
-                <button
-                  v-if="isEditMode"
-                  class="widget-delete-btn"
-                  @click.stop="handleDeleteWidget(widget)"
-                >
-                  ×
-                </button>
+                ×
+              </button>
 
-                <!-- 组件内容 -->
-                <div v-if="widget.enabled" class="widget-content" v-html="widget.content"></div>
+              <!-- 组件内容 -->
+              <div v-if="widget.enabled" class="widget-content" v-html="widget.content"></div>
 
-                <!-- 禁用状态遮罩 -->
-                <div v-if="!widget.enabled" class="widget-disabled-overlay">
-                  <span>已禁用</span>
-                </div>
+              <!-- 禁用状态遮罩 -->
+              <div v-if="!widget.enabled" class="widget-disabled-overlay">
+                <span>已禁用</span>
               </div>
+            </div>
 
-              <!-- 独立占位符：使用绝对定位，基于网格坐标显示 -->
-              <div
-                v-if="draggedWidget && dragOverIndex >= 0"
-                class="drop-placeholder-absolute"
-                :class="{ 'placeholder-large': draggedWidget.manifest?.expandedSize === 'large' }"
-                :style="getPlaceholderStyle()"
-              ></div>
+            <!-- 独立占位符：使用绝对定位，基于网格坐标显示 -->
+            <div
+              v-if="draggedWidget && dragOverIndex >= 0"
+              class="drop-placeholder-absolute"
+              :class="{ 'placeholder-large': draggedWidget.manifest?.expandedSize === 'large' }"
+              :style="getPlaceholderStyle()"
+            ></div>
 
-              <!-- 空状态 -->
-              <div v-if="expandedWidgets.length === 0" class="empty-state">
-                <div class="empty-icon">📦</div>
-                <div class="empty-text">暂无组件</div>
-                <div class="empty-hint">前往设置添加展开组件</div>
-              </div>
+            <!-- 空状态 -->
+            <div v-if="expandedWidgets.length === 0" class="empty-state">
+              <div class="empty-icon">📦</div>
+              <div class="empty-text">暂无组件</div>
+              <div class="empty-hint">前往设置添加展开组件</div>
             </div>
           </div>
         </div>
-      </transition>
+      </div>
     </div>
   </div>
 </template>
@@ -162,6 +158,9 @@ const dragOverIndex = ref<number>(-1) // 拖拽悬停的目标索引
 // 动画时长（与主进程保持一致）
 const ANIMATION_DURATION = 350
 
+// 预加载标志：标记展开组件是否已经加载过
+let expandedWidgetsPreloaded = false
+
 /**
  * 处理展开
  */
@@ -169,22 +168,26 @@ function handleExpand(): void {
   if (!isExpanded.value && !isAnimating.value) {
     isAnimating.value = true
 
-    // 先通知主进程开始窗口动画
+    // 通知主进程（保留 API 兼容性，但主进程不再执行窗口尺寸动画）
     if (window.api?.dynamicIsland?.expand) {
       window.api.dynamicIsland.expand()
     }
 
-    // 稍微延迟后再切换状态，让内容动画和窗口动画同步
-    setTimeout(() => {
-      isExpanded.value = true
-      // 加载展开组件
-      loadExpandedWidgets()
+    // 直接切换状态，触发 CSS 动画
+    isExpanded.value = true
 
-      // 动画完成后重置标志
+    // 性能优化：如果已经预加载，直接使用；否则在动画完成后再加载
+    if (!expandedWidgetsPreloaded) {
+      // 首次展开：延迟加载，避免阻塞动画
       setTimeout(() => {
-        isAnimating.value = false
-      }, ANIMATION_DURATION)
-    }, 50) // 50ms 延迟，确保窗口动画已经开始
+        loadExpandedWidgets()
+      }, ANIMATION_DURATION - 50) // 在动画快结束时开始加载
+    }
+
+    // 动画完成后重置标志
+    setTimeout(() => {
+      isAnimating.value = false
+    }, ANIMATION_DURATION)
   }
 }
 
@@ -195,20 +198,18 @@ function handleCollapse(): void {
   if (isExpanded.value && !isAnimating.value) {
     isAnimating.value = true
 
-    // 先切换状态，触发内容淡出
+    // 通知主进程（保留 API 兼容性，但主进程不再执行窗口尺寸动画）
+    if (window.api?.dynamicIsland?.collapse) {
+      window.api.dynamicIsland.collapse()
+    }
+
+    // 直接切换状态，触发 CSS 动画
     isExpanded.value = false
 
-    // 延迟一点再通知主进程开始窗口动画，让内容先开始淡出
+    // 动画完成后重置标志
     setTimeout(() => {
-      if (window.api?.dynamicIsland?.collapse) {
-        window.api.dynamicIsland.collapse()
-      }
-
-      // 动画完成后重置标志
-      setTimeout(() => {
-        isAnimating.value = false
-      }, ANIMATION_DURATION)
-    }, 100) // 100ms 延迟，让内容先淡出一部分
+      isAnimating.value = false
+    }, ANIMATION_DURATION)
   }
 }
 
@@ -295,6 +296,10 @@ async function loadExpandedWidgets(): Promise<void> {
     )
 
     expandedWidgets.value = loadedWidgets.filter((w) => w !== null) as ExpandedWidgetItem[]
+
+    // 标记已预加载
+    expandedWidgetsPreloaded = true
+    console.log('[DynamicIsland] Expanded widgets loaded successfully')
   } catch (error) {
     console.error('[DynamicIsland] Failed to load expanded widgets:', error)
   }
@@ -669,9 +674,23 @@ function stopWidgetUpdate(): void {
  * 组件挂载
  */
 onMounted(() => {
+  // 优先加载折叠状态组件（立即显示）
   loadWidgets()
-  loadExpandedWidgets()
   startWidgetUpdate()
+
+  // 立即在后台预加载展开组件（使用浏览器空闲时间或下一个事件循环）
+  // 这样既不阻塞界面渲染，又能尽快完成预加载，确保首次展开时数据已就绪
+  if (typeof requestIdleCallback !== 'undefined') {
+    // 优先使用 requestIdleCallback，在浏览器空闲时执行
+    requestIdleCallback(() => {
+      loadExpandedWidgets()
+    })
+  } else {
+    // 降级方案：使用 setTimeout(0) 在下一个事件循环立即执行
+    setTimeout(() => {
+      loadExpandedWidgets()
+    }, 0)
+  }
 })
 
 /**
@@ -698,33 +717,49 @@ onUnmounted(() => {
 
 /* 灵动岛主体 - 内容区域可接收鼠标事件 */
 .dynamic-island {
-  /* 使用绝对定位填充整个窗口，而不是相对于视口的 100% */
+  /* 折叠状态：显示为中间的小胶囊 */
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 30px;
   background: rgba(255, 255, 255, 0.66);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border-radius: 16px;
-  transition: border-radius 350ms cubic-bezier(0.32, 0.72, 0, 1);
   cursor: pointer;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: auto; /* 内容区域接收鼠标事件 */
+
+  /* 性能优化提示 */
+  will-change: width, height;
+
+  /* 平滑过渡 - 关键：left 和 transform 保持不变，只改变 width/height */
+  /* 注意：不要 transition backdrop-filter，性能开销太大 */
+  transition:
+    width 350ms cubic-bezier(0.32, 0.72, 0, 1),
+    height 350ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 350ms cubic-bezier(0.32, 0.72, 0, 1),
+    background 350ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* 展开状态 */
+/* 展开状态：填充整个窗口 */
 .dynamic-island.expanded {
+  /* 关键修复：保持 left: 50% 和 transform: translateX(-50%)，让元素从中心向两边均匀扩展 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
   border-radius: 18px;
   cursor: default;
   align-items: stretch;
   justify-content: stretch;
   background: rgba(255, 255, 255, 0.56); /* 展开时更透明 */
-  backdrop-filter: blur(40px); /* 增强模糊以补偿透明度 */
+  backdrop-filter: blur(40px); /* 不做 transition，直接切换以提高性能 */
   -webkit-backdrop-filter: blur(40px);
 }
 
@@ -740,6 +775,15 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 200ms ease-in;
+}
+
+/* 折叠内容隐藏状态 */
+.collapsed-content.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 组件插槽 */
@@ -808,6 +852,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease-out 100ms; /* 延迟 100ms 开始淡入 */
+}
+
+/* 展开内容显示状态 */
+.expanded-content.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* 标题栏 */
@@ -951,9 +1004,7 @@ onUnmounted(() => {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.drop-placeholder-absolute.placeholder-large {
-  /* 大型组件的高度由 JS 动态计算 */
-}
+/* 大型组件的高度由 JS 动态计算，通过内联样式设置 */
 
 .drop-placeholder-absolute::before {
   content: '放置到此处';
@@ -1098,25 +1149,6 @@ onUnmounted(() => {
 .empty-hint {
   font-size: 12px;
   opacity: 0.7;
-}
-
-/* 淡入淡出动画 - 延长时间以配合窗口动画 */
-.fade-enter-active {
-  transition: opacity 250ms ease-out 100ms; /* 延迟 100ms 开始淡入 */
-}
-
-.fade-leave-active {
-  transition: opacity 200ms ease-in;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.fade-enter-to,
-.fade-leave-from {
-  opacity: 1;
 }
 
 /* 自定义滚动条 */

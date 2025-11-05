@@ -40,13 +40,18 @@ export function createDynamicIslandWindow(): BrowserWindow {
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth } = primaryDisplay.workAreaSize
 
+  // 窗口始终使用展开状态的大小，通过 CSS 控制视觉上的折叠/展开
+  // 这样可以避免 Electron 窗口尺寸动画的 bug，动画更流畅
+  const expandedWidth = Math.floor(screenWidth * EXPANDED_CONFIG.widthPercent)
+  const expandedHeight = EXPANDED_CONFIG.height
+
   // 计算居中位置
-  const x = Math.floor((screenWidth - COLLAPSED_CONFIG.width) / 2)
+  const x = Math.floor((screenWidth - expandedWidth) / 2)
   const y = TOP_MARGIN
 
   const window = new BrowserWindow({
-    width: COLLAPSED_CONFIG.width,
-    height: COLLAPSED_CONFIG.height,
+    width: expandedWidth,
+    height: expandedHeight,
     x: x,
     y: y,
     show: false,
@@ -152,156 +157,30 @@ export function isDynamicIslandWindowOpen(): boolean {
 
 /**
  * 展开灵动岛
+ * 注意：窗口尺寸始终保持展开大小，展开/折叠动画由渲染层的 CSS 控制
+ * 这个函数现在只是一个空操作，保留是为了保持 API 兼容性
  */
 export function expandDynamicIsland(): void {
+  // 窗口尺寸不变，所有动画都在渲染层通过 CSS 完成
+  // 这样可以避免 Electron 窗口尺寸动画的 bug，动画更流畅
   if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
     return
   }
-
-  const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenWidth } = primaryDisplay.workAreaSize
-
-  // 计算展开后的宽度（屏幕宽度的 90%）
-  const expandedWidth = Math.floor(screenWidth * EXPANDED_CONFIG.widthPercent)
-  const expandedHeight = EXPANDED_CONFIG.height
-
-  // 计算展开后的居中位置
-  const targetX = Math.floor((screenWidth - expandedWidth) / 2)
-  const targetY = TOP_MARGIN
-
-  // 获取当前位置和尺寸
-  const currentBounds = dynamicIslandWindow.getBounds()
-  const startX = currentBounds.x
-  const startY = currentBounds.y
-  const startWidth = currentBounds.width
-  const startHeight = currentBounds.height
-
-  // 使用平滑动画
-  const startTime = Date.now()
-  const duration = ANIMATION_DURATION
-
-  // 缓动函数：cubic-bezier(0.32, 0.72, 0, 1)
-  const easeOutExpo = (t: number): number => {
-    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
-  }
-
-  const animate = (): void => {
-    if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
-      return
-    }
-
-    const elapsed = Date.now() - startTime
-    const progress = Math.min(elapsed / duration, 1)
-    const easedProgress = easeOutExpo(progress)
-
-    // 插值计算当前位置和尺寸
-    const currentX = Math.floor(startX + (targetX - startX) * easedProgress)
-    const currentY = Math.floor(startY + (targetY - startY) * easedProgress)
-    const currentWidth = Math.floor(startWidth + (expandedWidth - startWidth) * easedProgress)
-    const currentHeight = Math.floor(startHeight + (expandedHeight - startHeight) * easedProgress)
-
-    // 应用新的位置和尺寸
-    dynamicIslandWindow.setBounds({
-      x: currentX,
-      y: currentY,
-      width: currentWidth,
-      height: currentHeight
-    })
-
-    // 继续动画或设置最终精确尺寸
-    if (progress < 1) {
-      setTimeout(animate, 16) // 约 60fps
-    } else {
-      // 动画结束，明确设置精确的最终尺寸
-      if (!dynamicIslandWindow.isDestroyed()) {
-        dynamicIslandWindow.setBounds({
-          x: targetX,
-          y: targetY,
-          width: expandedWidth,
-          height: expandedHeight
-        })
-        console.log(`[DynamicIsland] Expanded to final size: ${expandedWidth}x${expandedHeight}`)
-      }
-    }
-  }
-
-  animate()
+  console.log('[DynamicIsland] Expand triggered (CSS animation in renderer)')
 }
 
 /**
  * 折叠灵动岛
+ * 注意：窗口尺寸始终保持展开大小，展开/折叠动画由渲染层的 CSS 控制
+ * 这个函数现在只是一个空操作，保留是为了保持 API 兼容性
  */
 export function collapseDynamicIsland(): void {
+  // 窗口尺寸不变，所有动画都在渲染层通过 CSS 完成
+  // 这样可以避免 Electron 窗口尺寸动画的 bug，动画更流畅
   if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
     return
   }
-
-  const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenWidth } = primaryDisplay.workAreaSize
-
-  // 计算折叠后的居中位置
-  const targetX = Math.floor((screenWidth - COLLAPSED_CONFIG.width) / 2)
-  const targetY = TOP_MARGIN
-  const targetWidth = COLLAPSED_CONFIG.width
-  const targetHeight = COLLAPSED_CONFIG.height
-
-  // 获取当前位置和尺寸
-  const currentBounds = dynamicIslandWindow.getBounds()
-  const startX = currentBounds.x
-  const startY = currentBounds.y
-  const startWidth = currentBounds.width
-  const startHeight = currentBounds.height
-
-  // 使用平滑动画
-  const startTime = Date.now()
-  const duration = ANIMATION_DURATION
-
-  // 缓动函数：cubic-bezier(0.32, 0.72, 0, 1)
-  const easeOutExpo = (t: number): number => {
-    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
-  }
-
-  const animate = (): void => {
-    if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
-      return
-    }
-
-    const elapsed = Date.now() - startTime
-    const progress = Math.min(elapsed / duration, 1)
-    const easedProgress = easeOutExpo(progress)
-
-    // 插值计算当前位置和尺寸
-    const currentX = Math.floor(startX + (targetX - startX) * easedProgress)
-    const currentY = Math.floor(startY + (targetY - startY) * easedProgress)
-    const currentWidth = Math.floor(startWidth + (targetWidth - startWidth) * easedProgress)
-    const currentHeight = Math.floor(startHeight + (targetHeight - startHeight) * easedProgress)
-
-    // 应用新的位置和尺寸
-    dynamicIslandWindow.setBounds({
-      x: currentX,
-      y: currentY,
-      width: currentWidth,
-      height: currentHeight
-    })
-
-    // 继续动画或设置最终精确尺寸
-    if (progress < 1) {
-      setTimeout(animate, 16) // 约 60fps
-    } else {
-      // 动画结束，明确设置精确的最终尺寸
-      if (!dynamicIslandWindow.isDestroyed()) {
-        dynamicIslandWindow.setBounds({
-          x: targetX,
-          y: targetY,
-          width: targetWidth,
-          height: targetHeight
-        })
-        console.log(`[DynamicIsland] Collapsed to final size: ${targetWidth}x${targetHeight}`)
-      }
-    }
-  }
-
-  animate()
+  console.log('[DynamicIsland] Collapse triggered (CSS animation in renderer)')
 }
 
 /**
