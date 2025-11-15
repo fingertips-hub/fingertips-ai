@@ -111,7 +111,13 @@ const api = {
       ipcRenderer.invoke('settings:get-dynamic-island-expanded-widgets'),
     // 设置灵动岛展开状态组件配置
     setDynamicIslandExpandedWidgets: (config: any) =>
-      ipcRenderer.invoke('settings:set-dynamic-island-expanded-widgets', config) as Promise<boolean>
+      ipcRenderer.invoke('settings:set-dynamic-island-expanded-widgets', config) as Promise<boolean>,
+    // 获取已启用的展开插件配置
+    getEnabledExpandedPlugins: () =>
+      ipcRenderer.invoke('settings:get-enabled-expanded-plugins'),
+    // 设置已启用的展开插件配置
+    setEnabledExpandedPlugins: (config: any) =>
+      ipcRenderer.invoke('settings:set-enabled-expanded-plugins', config) as Promise<boolean>
   },
   // AI Shortcut Runner 相关API
   aiShortcutRunner: {

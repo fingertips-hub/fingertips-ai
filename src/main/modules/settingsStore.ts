@@ -27,6 +27,15 @@ export interface DynamicIslandExpandedConfig {
 }
 
 /**
+ * 已启用的展开插件配置
+ * 记录用户在设置中启用的展开插件ID列表
+ * 这些插件可以在灵动岛编辑模式中拖入到展开区域使用
+ */
+export interface EnabledExpandedPluginsConfig {
+  pluginIds: string[] // 已启用的展开插件 ID 列表
+}
+
+/**
  * 应用设置接口
  */
 export interface AppSettings {
@@ -37,6 +46,7 @@ export interface AppSettings {
   dynamicIslandEnabled: boolean // 启用灵动岛
   dynamicIslandWidgets: DynamicIslandWidgetConfig // 灵动岛折叠状态组件配置
   dynamicIslandExpandedWidgets: DynamicIslandExpandedConfig // 灵动岛展开状态组件配置
+  enabledExpandedPlugins: EnabledExpandedPluginsConfig // 已启用的展开插件配置
 
   // AI 设置
   aiBaseUrl: string
@@ -60,6 +70,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   dynamicIslandExpandedWidgets: {
     widgets: [] // 默认展开状态无组件
+  },
+  enabledExpandedPlugins: {
+    pluginIds: [] // 默认没有启用任何展开插件
   },
 
   aiBaseUrl: 'https://api.openai.com/v1',

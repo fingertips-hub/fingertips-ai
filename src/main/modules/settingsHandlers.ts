@@ -142,6 +142,35 @@ export function setupSettingsHandlers(): void {
     }
   })
 
+  // 获取已启用的展开插件配置
+  ipcMain.handle('settings:get-enabled-expanded-plugins', async () => {
+    try {
+      const config = await getSetting('enabledExpandedPlugins')
+      console.log('[SettingsHandlers] Get enabled expanded plugins:', config.pluginIds)
+      return config
+    } catch (error) {
+      console.error('[SettingsHandlers] Failed to get enabled expanded plugins:', error)
+      return { pluginIds: [] }
+    }
+  })
+
+  // 设置已启用的展开插件配置
+  ipcMain.handle('settings:set-enabled-expanded-plugins', async (_event, config) => {
+    try {
+      console.log('[SettingsHandlers] Setting enabled expanded plugins:', config.pluginIds)
+      await setSetting('enabledExpandedPlugins', config)
+      
+      // 验证保存
+      const savedConfig = await getSetting('enabledExpandedPlugins')
+      console.log('[SettingsHandlers] Verified saved enabled expanded plugins:', savedConfig.pluginIds)
+      
+      return true
+    } catch (error) {
+      console.error('[SettingsHandlers] Failed to set enabled expanded plugins:', error)
+      return false
+    }
+  })
+
   // 选择文件夹
   ipcMain.handle('settings:select-folder', async (_event, currentPath?: string) => {
     // 获取设置窗口作为父窗口，使对话框居中

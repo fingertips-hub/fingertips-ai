@@ -41,7 +41,7 @@
               @change="handleWidgetChange"
             >
               <option value="">选择一个组件</option>
-              <option v-for="widget in availableWidgets" :key="widget.id" :value="widget.id">
+              <option v-for="widget in collapsedAvailableWidgets" :key="widget.id" :value="widget.id">
                 {{ widget.name }} - {{ widget.description }}
               </option>
             </select>
@@ -60,7 +60,7 @@
               @change="handleWidgetChange"
             >
               <option value="">选择一个组件</option>
-              <option v-for="widget in availableWidgets" :key="widget.id" :value="widget.id">
+              <option v-for="widget in collapsedAvailableWidgets" :key="widget.id" :value="widget.id">
                 {{ widget.name }} - {{ widget.description }}
               </option>
             </select>
@@ -79,7 +79,7 @@
               @change="handleWidgetChange"
             >
               <option value="">选择一个组件</option>
-              <option v-for="widget in availableWidgets" :key="widget.id" :value="widget.id">
+              <option v-for="widget in collapsedAvailableWidgets" :key="widget.id" :value="widget.id">
                 {{ widget.name }} - {{ widget.description }}
               </option>
             </select>
@@ -88,17 +88,17 @@
 
         <!-- 可用组件列表 -->
         <div class="available-widgets-section">
-          <h4 class="subsection-title">可用组件 ({{ availableWidgets.length }})</h4>
+          <h4 class="subsection-title">可用组件 ({{ collapsedAvailableWidgets.length }})</h4>
           <div v-if="loading" class="loading-state">
             <Icon icon="mdi:loading" class="spinning" />
             <span>加载中...</span>
           </div>
-          <div v-else-if="availableWidgets.length === 0" class="empty-state">
+          <div v-else-if="collapsedAvailableWidgets.length === 0" class="empty-state">
             <Icon icon="mdi:package-variant" class="empty-icon" />
             <p>暂无可用组件</p>
           </div>
           <div v-else class="widgets-grid">
-            <div v-for="widget in availableWidgets" :key="widget.id" class="widget-card">
+            <div v-for="widget in collapsedAvailableWidgets" :key="widget.id" class="widget-card">
               <div class="widget-card-header">
                 <span class="widget-card-name">{{ widget.name }}</span>
                 <span v-if="widget.type === 'simple'" class="widget-tag tag-simple">简单</span>
@@ -116,97 +116,52 @@
 
       <!-- 展开组件设置 -->
       <div v-else-if="activeTab === 'expanded'" class="expanded-widgets-settings">
-        <h3 class="section-title">展开组件配置</h3>
-        <p class="section-desc">配置灵动岛展开状态时显示的组件，支持拖拽排序</p>
+        <h3 class="section-title">展开插件管理</h3>
+        <p class="section-desc">
+          启用插件后，可以在灵动岛展开窗口的编辑模式中，从右侧面板拖入插件到展开区域使用
+        </p>
 
-        <!-- 已配置的组件列表 -->
-        <div class="configured-widgets">
-          <div class="configured-header">
-            <h4 class="subsection-title">已配置组件 ({{ expandedWidgets.length }})</h4>
-            <button class="add-widget-btn" @click="showAddWidgetDialog = true">
-              <Icon icon="mdi:plus" />
-              添加组件
-            </button>
+        <!-- 可用插件列表 -->
+        <div class="available-plugins-section">
+          <h4 class="subsection-title">可用插件 ({{ expandedAvailableWidgets.length }})</h4>
+          
+          <div v-if="loading" class="loading-state">
+            <Icon icon="mdi:loading" class="spinning" />
+            <span>加载中...</span>
           </div>
-
-          <div v-if="expandedWidgets.length === 0" class="empty-state">
+          
+          <div v-else-if="expandedAvailableWidgets.length === 0" class="empty-state">
             <Icon icon="mdi:package-variant-closed" class="empty-icon" />
-            <p>暂无配置组件</p>
-            <button class="add-widget-btn-large" @click="showAddWidgetDialog = true">
-              <Icon icon="mdi:plus-circle" />
-              添加第一个组件
-            </button>
+            <p>暂无可用的展开插件</p>
           </div>
-
-          <div v-else class="expanded-widget-list">
+          
+          <div v-else class="plugins-grid">
             <div
-              v-for="(widget, index) in expandedWidgets"
-              :key="widget.widgetId"
-              class="expanded-widget-item"
-              :draggable="true"
-              @dragstart="handleExpandedDragStart(index)"
-              @dragover.prevent
-              @drop="handleExpandedDrop(index)"
+              v-for="widget in expandedAvailableWidgets"
+              :key="widget.id"
+              class="plugin-card"
+              :class="{ 'plugin-enabled': isPluginEnabled(widget.id) }"
             >
-              <Icon icon="mdi:drag" class="drag-handle" />
-              <div class="widget-info">
-                <span class="widget-name">{{ widget.name }}</span>
-                <span class="widget-size-tag" :class="`tag-${widget.size}`">
-                  {{ widget.size === 'large' ? '大型' : '小型' }}
-                </span>
-              </div>
-              <div class="widget-actions">
+              <div class="plugin-card-header">
+                <div class="plugin-info">
+                  <span class="plugin-name">{{ widget.name }}</span>
+                  <span class="widget-size-tag" :class="`tag-${widget.expandedSize || 'small'}`">
+                    {{ widget.expandedSize === 'large' ? '大型' : '小型' }}
+                  </span>
+                </div>
                 <label class="switch">
                   <input
                     type="checkbox"
-                    :checked="widget.enabled"
-                    @change="toggleExpandedWidget(widget)"
+                    :checked="isPluginEnabled(widget.id)"
+                    @change="togglePluginEnabled(widget.id)"
                   />
                   <span class="slider"></span>
                 </label>
-                <button class="delete-btn" @click="removeExpandedWidget(index)">
-                  <Icon icon="mdi:delete" />
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 添加组件对话框 -->
-        <div
-          v-if="showAddWidgetDialog"
-          class="dialog-overlay"
-          @click.self="showAddWidgetDialog = false"
-        >
-          <div class="dialog-content">
-            <div class="dialog-header">
-              <h3>添加展开组件</h3>
-              <button class="dialog-close" @click="showAddWidgetDialog = false">
-                <Icon icon="mdi:close" />
-              </button>
-            </div>
-            <div class="dialog-body">
-              <div v-if="expandedAvailableWidgets.length === 0" class="empty-state">
-                <p>暂无可用的展开组件</p>
-              </div>
-              <div v-else class="add-widget-grid">
-                <div
-                  v-for="widget in expandedAvailableWidgets"
-                  :key="widget.id"
-                  class="add-widget-card"
-                  @click="addExpandedWidget(widget)"
-                >
-                  <div class="add-widget-card-header">
-                    <span class="widget-name">{{ widget.name }}</span>
-                    <span class="widget-size-tag" :class="`tag-${widget.expandedSize}`">
-                      {{ widget.expandedSize === 'large' ? '大型' : '小型' }}
-                    </span>
-                  </div>
-                  <p class="add-widget-desc">{{ widget.description }}</p>
-                  <div class="add-widget-footer">
-                    <span class="widget-meta">{{ widget.author }}</span>
-                  </div>
-                </div>
+              <p class="plugin-desc">{{ widget.description }}</p>
+              <div class="plugin-footer">
+                <span class="plugin-meta">{{ widget.author }}</span>
+                <span class="plugin-version">v{{ widget.version }}</span>
               </div>
             </div>
           </div>
@@ -217,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, toRaw } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useToast } from '../../composables/useToast'
 
@@ -236,11 +191,16 @@ const widgetConfig = ref({
 // 可用组件列表
 const availableWidgets = ref<any[]>([])
 
-// 展开组件配置
-const expandedWidgets = ref<any[]>([])
+// 折叠组件可用列表（过滤出 category 为 collapsed 或 both 的组件）
+const collapsedAvailableWidgets = computed(() => {
+  return availableWidgets.value.filter(
+    (w: any) => w.category === 'collapsed' || w.category === 'both'
+  )
+})
+
+// 展开插件启用状态
+const enabledExpandedPlugins = ref<string[]>([])
 const expandedAvailableWidgets = ref<any[]>([])
-const showAddWidgetDialog = ref(false)
-const draggedExpandedIndex = ref<number | null>(null)
 
 // 加载状态
 const loading = ref(false)
@@ -303,133 +263,79 @@ async function handleWidgetChange(): Promise<void> {
 }
 
 /**
- * 加载展开组件配置
+ * 加载展开插件启用状态
  */
-async function loadExpandedWidgetsConfig(): Promise<void> {
+async function loadExpandedPluginsConfig(): Promise<void> {
   try {
-    const config = await window.api.settings.getDynamicIslandExpandedWidgets()
+    const config = await window.api.settings.getEnabledExpandedPlugins()
     const allWidgets = await window.api.dynamicIslandWidget.getAll()
 
-    // 加载已配置的展开组件
-    expandedWidgets.value = (config.widgets || []).map((item: any) => {
-      const widget = allWidgets.find((w: any) => w.id === item.widgetId)
-      return {
-        ...item,
-        name: widget?.name || '未知组件',
-        size: widget?.expandedSize || 'small'
-      }
-    })
+    // 加载已启用的插件ID列表
+    enabledExpandedPlugins.value = config.pluginIds || []
 
-    // 加载可用的展开组件（category 为 expanded 或 both）
+    // 加载所有可用的展开组件（category 为 expanded 或 both）
     expandedAvailableWidgets.value = allWidgets.filter(
-      (w: any) =>
-        (w.category === 'expanded' || w.category === 'both') &&
-        !expandedWidgets.value.some((ew: any) => ew.widgetId === w.id)
+      (w: any) => w.category === 'expanded' || w.category === 'both'
     )
   } catch (error) {
-    console.error('[DynamicIslandSettings] Failed to load expanded widgets:', error)
-    toast.error('加载展开组件失败')
+    console.error('[DynamicIslandSettings] Failed to load expanded plugins config:', error)
+    toast.error('加载展开插件配置失败')
   }
 }
 
 /**
- * 添加展开组件
+ * 切换插件启用状态
  */
-async function addExpandedWidget(widget: any): Promise<void> {
+async function togglePluginEnabled(pluginId: string): Promise<void> {
   try {
-    const newWidget = {
-      widgetId: widget.id,
-      row: 0,
-      col: expandedWidgets.value.length,
-      rowSpan: widget.expandedSize === 'large' ? 2 : 1,
-      colSpan: 1,
-      enabled: true,
-      name: widget.name,
-      size: widget.expandedSize || 'small'
+    const index = enabledExpandedPlugins.value.indexOf(pluginId)
+    if (index > -1) {
+      // 禁用插件
+      enabledExpandedPlugins.value.splice(index, 1)
+      toast.success('已禁用插件')
+    } else {
+      // 启用插件
+      enabledExpandedPlugins.value.push(pluginId)
+      toast.success('已启用插件')
     }
-
-    expandedWidgets.value.push(newWidget)
-    await saveExpandedWidgetsConfig()
-    await loadExpandedWidgetsConfig()
-    showAddWidgetDialog.value = false
-    toast.success(`已添加组件：${widget.name}`)
+    await saveEnabledPluginsConfig()
   } catch (error) {
-    console.error('[DynamicIslandSettings] Failed to add widget:', error)
-    toast.error('添加组件失败')
+    console.error('[DynamicIslandSettings] Failed to toggle plugin:', error)
+    toast.error('切换插件状态失败')
   }
 }
 
 /**
- * 删除展开组件
+ * 检查插件是否已启用
  */
-async function removeExpandedWidget(index: number): Promise<void> {
+function isPluginEnabled(pluginId: string): boolean {
+  return enabledExpandedPlugins.value.includes(pluginId)
+}
+
+/**
+ * 保存已启用插件配置
+ */
+async function saveEnabledPluginsConfig(): Promise<void> {
   try {
-    const widget = expandedWidgets.value[index]
-    expandedWidgets.value.splice(index, 1)
-    await saveExpandedWidgetsConfig()
-    await loadExpandedWidgetsConfig()
-    toast.success(`已删除组件：${widget.name}`)
-  } catch (error) {
-    console.error('[DynamicIslandSettings] Failed to remove widget:', error)
-    toast.error('删除组件失败')
-  }
-}
-
-/**
- * 切换展开组件启用状态
- */
-async function toggleExpandedWidget(widget: any): Promise<void> {
-  try {
-    widget.enabled = !widget.enabled
-    await saveExpandedWidgetsConfig()
-    toast.success(widget.enabled ? '已启用组件' : '已禁用组件')
-  } catch (error) {
-    console.error('[DynamicIslandSettings] Failed to toggle widget:', error)
-    toast.error('切换组件状态失败')
-  }
-}
-
-/**
- * 拖拽开始
- */
-function handleExpandedDragStart(index: number): void {
-  draggedExpandedIndex.value = index
-}
-
-/**
- * 拖拽放置
- */
-async function handleExpandedDrop(targetIndex: number): Promise<void> {
-  if (draggedExpandedIndex.value === null || draggedExpandedIndex.value === targetIndex) {
-    return
-  }
-
-  const draggedItem = expandedWidgets.value[draggedExpandedIndex.value]
-  expandedWidgets.value.splice(draggedExpandedIndex.value, 1)
-  expandedWidgets.value.splice(targetIndex, 0, draggedItem)
-  draggedExpandedIndex.value = null
-
-  await saveExpandedWidgetsConfig()
-}
-
-/**
- * 保存展开组件配置
- */
-async function saveExpandedWidgetsConfig(): Promise<void> {
-  try {
+    // 使用 toRaw 解除 Vue 响应式代理，确保传递给 IPC 的是纯数据
     const config = {
-      widgets: expandedWidgets.value.map((w, index) => ({
-        widgetId: w.widgetId,
-        row: 0,
-        col: index,
-        rowSpan: w.rowSpan,
-        colSpan: w.colSpan,
-        enabled: w.enabled
-      }))
+      pluginIds: toRaw(enabledExpandedPlugins.value)
     }
-    await window.api.settings.setDynamicIslandExpandedWidgets(config)
+    const success = await window.api.settings.setEnabledExpandedPlugins(config)
+    
+    if (!success) {
+      throw new Error('保存配置返回失败')
+    }
+    
+    // 验证保存是否成功
+    const savedConfig = await window.api.settings.getEnabledExpandedPlugins()
+    if (JSON.stringify(savedConfig.pluginIds) !== JSON.stringify(config.pluginIds)) {
+      throw new Error('保存的配置与预期不符')
+    }
+    
+    console.log('[DynamicIslandSettings] Enabled plugins saved successfully:', config.pluginIds)
   } catch (error) {
-    console.error('[DynamicIslandSettings] Failed to save expanded widgets:', error)
+    console.error('[DynamicIslandSettings] Failed to save enabled plugins:', error)
     throw error
   }
 }
@@ -440,7 +346,7 @@ async function saveExpandedWidgetsConfig(): Promise<void> {
 onMounted(async () => {
   await loadAvailableWidgets()
   await loadWidgetConfig()
-  await loadExpandedWidgetsConfig()
+  await loadExpandedPluginsConfig()
 })
 </script>
 
@@ -698,33 +604,86 @@ onMounted(async () => {
   font-family: 'Consolas', monospace;
 }
 
-/* 即将推出 */
-.coming-soon {
+/* 可用插件区域 */
+.available-plugins-section {
+  margin-top: 24px;
+}
+
+.plugins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.plugin-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.plugin-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.plugin-card.plugin-enabled {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
+}
+
+.plugin-card.plugin-enabled:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+}
+
+.plugin-card-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 96px 48px;
-  text-align: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.coming-soon-icon {
-  font-size: 64px;
-  color: #d1d5db;
-  margin-bottom: 20px;
+.plugin-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.coming-soon h3 {
-  font-size: 20px;
+.plugin-name {
+  font-size: 15px;
   font-weight: 600;
-  color: #6b7280;
-  margin: 0 0 8px 0;
+  color: #1f2937;
 }
 
-.coming-soon p {
-  font-size: 14px;
+.plugin-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+  min-height: 40px;
+}
+
+.plugin-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.plugin-meta {
+  font-size: 12px;
   color: #9ca3af;
-  margin: 0;
+}
+
+.plugin-version {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: 'Consolas', monospace;
 }
 
 /* 展开组件设置 */

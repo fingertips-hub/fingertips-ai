@@ -3,13 +3,19 @@
     <div
       ref="islandRef"
       class="dynamic-island"
-      :class="{ expanded: isExpanded }"
+      :class="{ expanded: isExpanded, 'is-animating': isAnimating }"
       @click="handleExpand"
       @mouseenter="handleMouseEnter"
       @mouseleave="handleMouseLeave"
     >
       <!-- 折叠状态内容 - DOM 始终存在，用 CSS 类控制显示/隐藏，避免 DOM 操作阻塞动画 -->
-      <div class="collapsed-content" :class="{ hidden: isExpanded }">
+      <div
+        class="collapsed-content"
+        :class="{
+          hidden: isExpanded,
+          'hidden-immediate': shouldForceHideCollapsedContent
+        }"
+      >
         <!-- 左侧组件 -->
         <div v-if="leftWidget" class="widget-slot widget-left" v-html="leftWidget"></div>
 
@@ -27,7 +33,7 @@
       </div>
 
       <!-- 展开状态内容 - DOM 始终存在，用 CSS 类控制显示/隐藏，避免 DOM 操作阻塞动画 -->
-      <div class="expanded-content" :class="{ visible: isExpanded }">
+      <div class="expanded-content" :class="{ visible: isExpanded, 'edit-mode-active': isEditMode }">
         <!-- 标题栏 -->
         <div class="expanded-header">
           <div class="expanded-title-group">
@@ -43,6 +49,9 @@
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                 />
               </svg>
+            </button>
+            <button v-if="isEditMode" class="done-btn" title="添加插件" @click.stop="openPluginSelector">
+              添加
             </button>
             <button v-if="isEditMode" class="done-btn" title="完成" @click.stop="toggleEditMode">
               完成
@@ -60,7 +69,7 @@
           </div>
         </div>
 
-        <!-- 组件网格区域 -->
+        <!-- 主内容区域：网格 -->
         <div class="expanded-body">
           <div
             class="widget-grid"
@@ -111,27 +120,37 @@
               :style="getPlaceholderStyle()"
             ></div>
 
-            <!-- 空状态 -->
-            <div v-if="expandedWidgets.length === 0" class="empty-state">
+            <!-- 空状态：仅在展开完成且无组件时显示，避免动画结束时内容跳动 -->
+            <div v-if="showEmptyState" class="empty-state">
               <div class="empty-icon">📦</div>
               <div class="empty-text">暂无组件</div>
-              <div class="empty-hint">前往设置添加展开组件</div>
+              <div class="empty-hint">{{ isEditMode ? '点击"添加"按钮选择插件，或前往设置启用插件' : '前往设置启用展开插件' }}</div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- 插件选择器 -->
+    <PluginSelector
+      :visible="showPluginSelector"
+      :plugins="availablePlugins"
+      @close="closePluginSelector"
+      @select="handlePluginSelect"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import PluginSelector from './components/common/PluginSelector.vue'
 
 // 状态
 const isExpanded = ref(false)
 const islandRef = ref<HTMLElement | null>(null)
 const isAnimating = ref(false)
 const isEditMode = ref(false)
+const showPluginSelector = ref(false)
 
 // 折叠状态组件
 const leftWidget = ref<string>('')
@@ -154,6 +173,25 @@ interface ExpandedWidgetItem {
 const expandedWidgets = ref<ExpandedWidgetItem[]>([])
 const draggedWidget = ref<ExpandedWidgetItem | null>(null)
 const dragOverIndex = ref<number>(-1) // 拖拽悬停的目标索引
+
+// 可用插件列表（已启用但未添加到网格中的）
+interface AvailablePlugin {
+  id: string
+  name: string
+  description: string
+  expandedSize: 'small' | 'large'
+  manifest: any
+}
+
+const availablePlugins = ref<AvailablePlugin[]>([])
+
+const shouldForceHideCollapsedContent = computed(
+  () => isExpanded.value && expandedWidgets.value.length === 0
+)
+
+const showEmptyState = computed(
+  () => isExpanded.value && !isAnimating.value && expandedWidgets.value.length === 0
+)
 
 // 动画时长（与主进程保持一致）
 const ANIMATION_DURATION = 350
@@ -226,6 +264,11 @@ function handleMouseEnter(): void {
  * 鼠标离开灵动岛 - 启用穿透让下方可点击
  */
 function handleMouseLeave(): void {
+  // 如果插件选择器正在显示，则保持窗口可交互，不恢复穿透
+  if (showPluginSelector.value) {
+    return
+  }
+
   if (window.api?.dynamicIsland?.setIgnoreMouseEvents) {
     window.api.dynamicIsland.setIgnoreMouseEvents(true)
   }
@@ -297,6 +340,9 @@ async function loadExpandedWidgets(): Promise<void> {
 
     expandedWidgets.value = loadedWidgets.filter((w) => w !== null) as ExpandedWidgetItem[]
 
+    // 加载可用插件列表
+    await loadAvailablePlugins()
+
     // 标记已预加载
     expandedWidgetsPreloaded = true
     console.log('[DynamicIsland] Expanded widgets loaded successfully')
@@ -306,10 +352,160 @@ async function loadExpandedWidgets(): Promise<void> {
 }
 
 /**
+ * 加载可用插件（已启用但未添加到网格中的）
+ */
+async function loadAvailablePlugins(): Promise<void> {
+  try {
+    // 获取已启用的插件ID列表
+    const enabledConfig = await window.api.settings.getEnabledExpandedPlugins()
+    const enabledIds = enabledConfig.pluginIds || []
+    console.log('[DynamicIsland] Enabled plugin IDs:', enabledIds)
+
+    // 获取所有组件
+    const allWidgets = await window.api.dynamicIslandWidget.getAll()
+    console.log('[DynamicIsland] Total widgets:', allWidgets.length)
+
+    // 已添加到网格中的插件ID
+    const addedIds = expandedWidgets.value.map((w) => w.widgetId)
+    console.log('[DynamicIsland] Already added plugin IDs:', addedIds)
+
+    // 过滤出已启用但未添加到网格中的插件
+    availablePlugins.value = allWidgets
+      .filter(
+        (w: any) =>
+          (w.category === 'expanded' || w.category === 'both') &&
+          enabledIds.includes(w.id) &&
+          !addedIds.includes(w.id)
+      )
+      .map((w: any) => ({
+        id: w.id,
+        name: w.name,
+        description: w.description,
+        expandedSize: w.expandedSize || 'small',
+        manifest: w.manifest
+      }))
+
+    console.log(
+      '[DynamicIsland] Available plugins loaded:',
+      availablePlugins.value.length,
+      'plugins:',
+      availablePlugins.value.map((p) => p.name)
+    )
+  } catch (error) {
+    console.error('[DynamicIsland] Failed to load available plugins:', error)
+  }
+}
+
+/**
  * 切换编辑模式
  */
-function toggleEditMode(): void {
+async function toggleEditMode(): Promise<void> {
   isEditMode.value = !isEditMode.value
+  
+  // 退出编辑模式时关闭插件选择器
+  if (!isEditMode.value) {
+    showPluginSelector.value = false
+  }
+  
+  // 进入编辑模式时，重新加载可用插件列表以同步最新的启用状态
+  if (isEditMode.value) {
+    await loadAvailablePlugins()
+    console.log('[DynamicIsland] Edit mode activated, available plugins reloaded')
+  }
+}
+
+/**
+ * 打开插件选择器
+ */
+function openPluginSelector(): void {
+  showPluginSelector.value = true
+
+  // 打开插件选择器时，确保窗口处于可交互状态
+  if (window.api?.dynamicIsland?.setIgnoreMouseEvents) {
+    window.api.dynamicIsland.setIgnoreMouseEvents(false)
+  }
+}
+
+/**
+ * 关闭插件选择器
+ */
+function closePluginSelector(): void {
+  showPluginSelector.value = false
+}
+
+/**
+ * 处理插件选择
+ */
+async function handlePluginSelect(plugin: AvailablePlugin): Promise<void> {
+  // 计算最佳插入位置（避免重叠）
+  const { row, col } = findAvailablePosition(plugin.expandedSize)
+  
+  // 添加插件到网格
+  await addPluginToGrid(plugin, row, col)
+  
+  // 关闭选择器
+  closePluginSelector()
+}
+
+/**
+ * 查找可用的不重叠位置
+ * 使用智能算法找到第一个可以放置组件的位置
+ */
+function findAvailablePosition(size: 'small' | 'large'): { row: number; col: number } {
+  // 获取网格列数（默认5列，根据实际情况动态计算）
+  const gridElement = document.querySelector('.widget-grid') as HTMLElement
+  let columns = 5 // 默认值
+  
+  if (gridElement) {
+    const gridWidth = gridElement.clientWidth
+    const gap = 12
+    const minCardWidth = 220
+    columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)))
+  }
+  
+  const rowSpan = size === 'large' ? 2 : 1
+  const colSpan = 1
+  
+  // 创建占用矩阵：记录每个网格单元是否被占用
+  const occupiedMatrix = new Map<string, boolean>()
+  
+  // 标记已有组件占用的位置
+  for (const widget of expandedWidgets.value) {
+    const widgetRowSpan = widget.manifest?.expandedSize === 'large' ? 2 : 1
+    const widgetColSpan = 1
+    
+    for (let r = widget.row; r < widget.row + widgetRowSpan; r++) {
+      for (let c = widget.col; c < widget.col + widgetColSpan; c++) {
+        occupiedMatrix.set(`${r},${c}`, true)
+      }
+    }
+  }
+  
+  // 从 (0,0) 开始搜索第一个可用位置
+  for (let row = 0; row < 100; row++) { // 限制最大搜索行数
+    for (let col = 0; col < columns; col++) {
+      // 检查当前位置及其跨度范围是否都是空闲的
+      let isAvailable = true
+      
+      for (let r = row; r < row + rowSpan; r++) {
+        for (let c = col; c < col + colSpan; c++) {
+          if (occupiedMatrix.has(`${r},${c}`)) {
+            isAvailable = false
+            break
+          }
+        }
+        if (!isAvailable) break
+      }
+      
+      if (isAvailable) {
+        return { row, col }
+      }
+    }
+  }
+  
+  // 如果找不到位置（理论上不应该发生），返回末尾位置
+  const lastRow = Math.max(0, ...expandedWidgets.value.map(w => w.row + (w.manifest?.expandedSize === 'large' ? 2 : 1)))
+  return { row: lastRow, col: 0 }
 }
 
 /**
@@ -416,7 +612,7 @@ function getPlaceholderStyle(): Record<string, string> {
 }
 
 /**
- * 拖拽开始
+ * 从网格拖拽开始
  */
 function handleDragStart(event: DragEvent, widget: ExpandedWidgetItem): void {
   draggedWidget.value = widget
@@ -521,10 +717,11 @@ function handleGridDragOver(event: DragEvent): void {
  * 网格放置 - 更新组件的网格位置（row, col）
  */
 async function handleGridDrop(_event: DragEvent): Promise<void> {
-  if (!draggedWidget.value) return
-
   const targetIndex = dragOverIndex.value
   if (targetIndex === -1) return
+
+  // 处理网格内拖拽
+  if (!draggedWidget.value) return
 
   // 获取网格参数（复用 handleGridDragOver 的逻辑）
   const gridElement = document.querySelector('.widget-grid') as HTMLElement
@@ -571,6 +768,64 @@ async function handleGridDrop(_event: DragEvent): Promise<void> {
   await saveExpandedWidgets()
 }
 
+
+/**
+ * 添加插件到网格
+ */
+async function addPluginToGrid(
+  plugin: AvailablePlugin,
+  row: number,
+  col: number
+): Promise<void> {
+  try {
+    // 渲染插件内容
+    const widget = await window.api.dynamicIslandWidget.get(plugin.id)
+    if (!widget || !widget.manifest) {
+      console.error('[DynamicIsland] Failed to get widget:', plugin.id)
+      return
+    }
+
+    let content = ''
+    if (widget.manifest.type === 'advanced' && widget.expandedHtmlContent) {
+      content = `<iframe srcdoc="${widget.expandedHtmlContent.replace(/"/g, '&quot;')}" frameborder="0" style="width: 100%; height: 100%; border: none;"></iframe>`
+    } else if (widget.manifest.type === 'simple' && widget.manifest.expandedTemplate) {
+      const data = await window.api.dynamicIslandWidget.getData(plugin.id)
+      content = widget.manifest.expandedTemplate.content
+      if (data) {
+        Object.keys(data).forEach((key) => {
+          content = content.replace(new RegExp(`{{${key}}}`, 'g'), data[key])
+        })
+      }
+    }
+
+    // 创建新组件
+    const newWidget: ExpandedWidgetItem = {
+      widgetId: plugin.id,
+      row,
+      col,
+      rowSpan: plugin.expandedSize === 'large' ? 2 : 1,
+      colSpan: 1,
+      enabled: true,
+      content,
+      manifest: widget.manifest,
+      isDragging: false
+    }
+
+    // 添加到网格
+    expandedWidgets.value.push(newWidget)
+
+    // 保存配置
+    await saveExpandedWidgets()
+
+    // 从可用插件列表中移除
+    await loadAvailablePlugins()
+
+    console.log('[DynamicIsland] Plugin added to grid:', plugin.name)
+  } catch (error) {
+    console.error('[DynamicIsland] Failed to add plugin to grid:', error)
+  }
+}
+
 /**
  * 删除组件
  */
@@ -579,6 +834,8 @@ async function handleDeleteWidget(widget: ExpandedWidgetItem): Promise<void> {
   if (index > -1) {
     expandedWidgets.value.splice(index, 1)
     await saveExpandedWidgets()
+    // 重新加载可用插件列表（被删除的组件会重新出现在侧边栏）
+    await loadAvailablePlugins()
   }
 }
 
@@ -704,8 +961,8 @@ onUnmounted(() => {
 <style scoped>
 /* 容器 - 完全穿透鼠标事件 */
 .dynamic-island-container {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -713,6 +970,10 @@ onUnmounted(() => {
   background: transparent;
   -webkit-app-region: no-drag;
   pointer-events: none; /* 容器本身不接收鼠标事件 */
+  overflow: hidden; /* 防止出现滚动条 */
+  position: fixed; /* 固定定位，避免布局影响 */
+  top: 0;
+  left: 0;
 }
 
 /* 灵动岛主体 - 内容区域可接收鼠标事件 */
@@ -752,8 +1013,8 @@ onUnmounted(() => {
   /* 关键修复：保持 left: 50% 和 transform: translateX(-50%)，让元素从中心向两边均匀扩展 */
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   border-radius: 18px;
   cursor: default;
   align-items: stretch;
@@ -772,11 +1033,12 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   padding: 0 16px;
   opacity: 1;
   pointer-events: auto;
+  overflow: hidden; /* 防止内容溢出 */
   transition: opacity 200ms ease-in;
 }
 
@@ -786,24 +1048,18 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
+.collapsed-content.hidden-immediate {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+  visibility: hidden;
+}
+
 /* 组件插槽 */
 .widget-slot {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-}
-
-.widget-left {
-  justify-content: flex-start;
-}
-
-.widget-center {
-  justify-content: center;
-  flex: 1;
-}
-
-.widget-right {
-  justify-content: flex-end;
 }
 
 /* 默认占位 */
@@ -854,6 +1110,7 @@ onUnmounted(() => {
   padding: 16px;
   opacity: 0;
   pointer-events: none;
+  overflow: hidden; /* 防止动画过程中出现滚动条 */
   transition: opacity 250ms ease-out 100ms; /* 延迟 100ms 开始淡入 */
 }
 
@@ -936,16 +1193,25 @@ onUnmounted(() => {
 .expanded-body {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 16px;
+  overflow: hidden;
+}
+
+/* 网格容器 */
+.expanded-body .widget-grid {
+  flex: 1;
   overflow-y: auto;
+}
+
+.dynamic-island.is-animating .expanded-body .widget-grid {
+  overflow-y: hidden;
 }
 
 /* 组件网格 */
 .widget-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  grid-template-rows: repeat(auto-fill, minmax(160px, auto));
   grid-auto-rows: 160px; /* 自动创建的行高度 */
   grid-auto-flow: row; /* 按行流式布局，不自动填充空白 */
   gap: 12px;

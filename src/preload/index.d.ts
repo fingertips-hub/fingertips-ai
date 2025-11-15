@@ -78,6 +78,12 @@ interface API {
         enabled: boolean
       }>
     }) => Promise<boolean>
+    getEnabledExpandedPlugins: () => Promise<{
+      pluginIds: string[]
+    }>
+    setEnabledExpandedPlugins: (config: {
+      pluginIds: string[]
+    }) => Promise<boolean>
   }
   aiShortcutRunner: {
     open: (shortcutData: {
