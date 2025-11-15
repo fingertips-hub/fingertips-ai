@@ -1212,7 +1212,6 @@ onUnmounted(() => {
 .widget-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  grid-auto-rows: 160px; /* 自动创建的行高度 */
   grid-auto-flow: row; /* 按行流式布局，不自动填充空白 */
   gap: 12px;
   width: 100%;
