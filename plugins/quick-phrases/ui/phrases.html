@@ -814,7 +814,7 @@
               :key="phrase.id"
               :class="['phrase-row', getCategoryClass(phrase.category), { copying: copyingId === phrase.id }]"
               @dblclick="copyPhrase(phrase)"
-              title="双击复制"
+              :title="phrase.content"
             >
               <span :class="['phrase-category', getCategoryClass(phrase.category)]">
                 {{ phrase.category }}

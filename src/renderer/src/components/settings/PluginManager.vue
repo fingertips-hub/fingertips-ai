@@ -11,6 +11,15 @@
           <Icon icon="mdi:plus" class="icon" />
           添加插件
         </button>
+        <button
+          class="btn-reload"
+          :disabled="isLoading"
+          @click="openPluginsDirectory"
+          :title="pluginsDirectory || '打开插件目录'"
+        >
+          <Icon icon="mdi:folder-open-outline" class="icon" />
+          打开插件目录
+        </button>
         <button class="btn-reload" :disabled="isLoading" @click="handleReloadAll">
           <Icon icon="mdi:refresh" class="icon" :class="{ spinning: isLoading }" />
           刷新列表
@@ -278,13 +287,6 @@
       <p v-if="!searchQuery && !selectedKeyword" class="empty-hint">
         将插件文件夹放入 <code>{{ pluginsDirectory || 'plugins/' }}</code> 目录中,然后刷新列表
       </p>
-      <button
-        v-if="!searchQuery && !selectedKeyword"
-        class="btn-reset-filter"
-        @click="openPluginsDirectory"
-      >
-        打开插件目录
-      </button>
       <p v-else class="empty-hint">尝试调整搜索条件或选择其他分类</p>
       <button v-if="searchQuery || selectedKeyword" @click="resetFilters" class="btn-reset-filter">
         清除筛选条件

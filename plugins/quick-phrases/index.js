@@ -132,13 +132,7 @@ module.exports = {
       try {
         context.api.clipboard.writeText(text)
         console.log('📋 已复制到剪切板:', text.substring(0, 30) + (text.length > 30 ? '...' : ''))
-        
-        // 显示通知
-        context.api.notification.show({
-          title: '已复制',
-          body: text.length > 50 ? text.substring(0, 50) + '...' : text
-        })
-        
+
         return { success: true }
       } catch (error) {
         console.error('复制失败:', error)
