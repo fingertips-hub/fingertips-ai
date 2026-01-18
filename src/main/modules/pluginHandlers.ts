@@ -264,22 +264,27 @@ export function setupPluginHandlers(): void {
       if (result.success) {
         console.log(`Plugin ${pluginId} updated successfully`)
 
-        // 更新成功后，立即重新扫描并加载新版本
-        try {
-          const rescanResult = await pluginManager.rescanPlugins()
-          console.log('Plugins rescanned after update:', rescanResult)
+        const updatedPluginId = result.pluginId || pluginId
 
-          // 如果之前是启用状态，重新启用
-          if (wasEnabled && result.pluginId) {
-            try {
-              await pluginManager.togglePlugin(result.pluginId, true)
-              console.log(`Plugin ${result.pluginId} re-enabled after update`)
-            } catch (error) {
-              console.error(`Failed to re-enable plugin after update:`, error)
-            }
+        // 关键：对“同 ID 更新”的插件，rescan 只会识别为“已存在”，不会自动卸载旧模块并加载新代码。
+        // 因此这里必须执行真正的 reload。
+        try {
+          const existing = pluginManager.getPlugin(updatedPluginId)
+          if (existing) {
+            await pluginManager.reloadPlugin(updatedPluginId)
+          } else {
+            // 若当前插件实例不存在（例如之前未加载），则通过 rescan 载入
+            await pluginManager.rescanPlugins()
           }
-        } catch (rescanError) {
-          console.error('Failed to rescan plugins after update:', rescanError)
+
+          // 如果之前是启用状态，重新启用（reloadPlugin 基于 activated 状态恢复，
+          // 但我们这里以 enabled 状态为准，确保更新前启用的插件更新后依旧启用）
+          if (wasEnabled) {
+            await pluginManager.togglePlugin(updatedPluginId, true)
+            console.log(`Plugin ${updatedPluginId} re-enabled after update`)
+          }
+        } catch (reloadError) {
+          console.error('Failed to reload plugin after update:', reloadError)
         }
       }
 
