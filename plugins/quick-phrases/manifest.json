@@ -1,0 +1,29 @@
+{
+  "id": "quick-phrases",
+  "name": "常用语速记",
+  "version": "1.0.0",
+  "description": "快速复制常用语到剪切板，双击即复制，支持分类管理和搜索",
+  "author": "Fingertips AI",
+  "icon": "mdi:text-box-multiple-outline",
+  "keywords": ["常用语", "复制", "剪切板", "短语", "快捷", "phrases"],
+  "license": "MIT",
+
+  "fingertips": {
+    "minVersion": "1.0.0"
+  },
+
+  "main": "index.js",
+
+  "permissions": ["window", "notification", "clipboard"],
+
+  "config": {
+    "defaults": {
+      "phrases": [],
+      "categories": ["工作", "生活", "邮件", "社交", "其他"]
+    }
+  },
+
+  "ui": {
+    "hasPanel": false
+  }
+}

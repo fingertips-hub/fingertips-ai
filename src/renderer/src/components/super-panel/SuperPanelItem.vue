@@ -441,21 +441,63 @@ async function executePlugin(): Promise<void> {
 
   // ⚡ 性能优化：直接从缓存的插件列表中查找，避免每次都重新加载
   // 注意：如果需要同步插件管理器的状态变化，应该通过事件监听机制，而不是每次都重新加载
-  const plugin = pluginStore.plugins.find((p) => p.id === pluginId)
+  let plugin = pluginStore.plugins.find((p) => p.id === pluginId) || null
 
   // ✅ 第一步：状态检查，避免无效执行
   // 如果插件不存在，显示错误并返回，不隐藏 SuperPanel
   if (!plugin) {
-    console.error('插件不存在，可能已被卸载')
-    toast.error('插件不存在，可能已被卸载')
-    return
+    try {
+      const details = await pluginStore.getPluginDetails(pluginId)
+      if (details) {
+        plugin = details
+      }
+    } catch {
+      // 忽略，继续走统一错误提示
+    }
+
+    if (!plugin) {
+      console.error('插件不存在，可能已被卸载')
+      toast.error('插件不存在，可能已被卸载')
+      return
+    }
   }
+
+  // 到这里 plugin 一定存在
+  if (!plugin) return
 
   // 如果插件未启用，显示警告并返回，不隐藏 SuperPanel
   if (!plugin.activated) {
-    console.warn('插件未启用，请先在设置中启用该插件')
-    toast.warning('插件未启用，请先在设置中启用该插件')
-    return
+    // 🧠 根因修复：Super Panel 可能只缓存了旧的插件状态（plugins 列表未刷新）
+    // 这里向主进程拉取一次详情以同步 activated/enabled 状态
+    try {
+      const details = await pluginStore.getPluginDetails(pluginId)
+      if (details) {
+        plugin = details
+      }
+    } catch {
+      // 忽略，继续后续判断
+    }
+
+    if (!plugin) return
+
+    if (!plugin.activated) {
+      const shouldEnable = confirm('插件未启用，是否现在启用并继续执行？')
+      if (!shouldEnable) return
+
+      const success = await pluginStore.togglePlugin(pluginId, true)
+      if (!success) {
+        toast.error('启用插件失败，请稍后重试')
+        return
+      }
+
+      // 重新取一次最新状态
+      plugin = pluginStore.plugins.find((p) => p.id === pluginId) || plugin
+      if (!plugin) return
+      if (!plugin.activated) {
+        toast.error('插件仍未启用，请稍后重试或在设置中手动启用')
+        return
+      }
+    }
   }
 
   // ✅ 第二步：状态检查通过，准备执行

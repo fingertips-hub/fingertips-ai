@@ -84,6 +84,11 @@ const isDragging = ref(false)
 const lastMouseX = ref(0)
 const lastMouseY = ref(0)
 
+// 🚀 拖拽性能优化：将高频 mousemove 合并到每帧一次 IPC，避免窗口在 Windows 透明/无边框模式下抖动
+let dragRafId: number | null = null
+let pendingDeltaX = 0
+let pendingDeltaY = 0
+
 // 固定状态
 const isPinned = ref(false)
 
@@ -130,8 +135,24 @@ const handleMouseMove = (event: MouseEvent): void => {
 
   // 只有当偏移量不为0时才发送IPC消息
   if (deltaX !== 0 || deltaY !== 0) {
-    // 通过IPC发送窗口移动请求到主进程
-    window.api.window.moveWindow(deltaX, deltaY)
+    // 将移动量累加，合并到下一帧发送
+    pendingDeltaX += deltaX
+    pendingDeltaY += deltaY
+
+    // 每帧最多发送一次 IPC，减少 setPosition 抖动
+    if (dragRafId === null) {
+      dragRafId = window.requestAnimationFrame(() => {
+        try {
+          if (pendingDeltaX !== 0 || pendingDeltaY !== 0) {
+            window.api.window.moveWindow(pendingDeltaX, pendingDeltaY)
+          }
+        } finally {
+          pendingDeltaX = 0
+          pendingDeltaY = 0
+          dragRafId = null
+        }
+      })
+    }
 
     // 更新上次鼠标位置
     lastMouseX.value = event.screenX
@@ -147,6 +168,17 @@ const handleMouseUp = (): void => {
     console.log('[SuperPanel] Drag ended')
   }
   isDragging.value = false
+
+  // 释放时立即刷新一次剩余位移，避免最后一帧丢失
+  if (dragRafId !== null) {
+    window.cancelAnimationFrame(dragRafId)
+    dragRafId = null
+  }
+  if (pendingDeltaX !== 0 || pendingDeltaY !== 0) {
+    window.api.window.moveWindow(pendingDeltaX, pendingDeltaY)
+    pendingDeltaX = 0
+    pendingDeltaY = 0
+  }
 }
 
 /**

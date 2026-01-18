@@ -21,6 +21,9 @@ let isListening = false
 let hasShownPanel = false // 标记是否已经显示了面板
 let capturedTextOnPress = '' // 在按键时立即捕获的文本
 
+// 全局鼠标按键按下状态追踪（用于判断是否处于拖拽等按压状态）
+const pressedMouseButtons: Set<number> = new Set()
+
 // Health check state
 let lastEventTime = Date.now() // 最后一次收到事件的时间
 let healthCheckInterval: NodeJS.Timeout | null = null
@@ -562,6 +565,9 @@ export function setupGlobalMouseListener(): void {
   uIOhook.on('mousedown', (event: UiohookMouseEvent) => {
     // 更新最后事件时间（健康检查）
     lastEventTime = Date.now()
+
+    // 记录按下的鼠标按键
+    pressedMouseButtons.add(event.button as number)
     handleButtonDown(event.button as number, event.x as number, event.y as number)
   })
 
@@ -569,6 +575,9 @@ export function setupGlobalMouseListener(): void {
   uIOhook.on('mouseup', (event: UiohookMouseEvent) => {
     // 更新最后事件时间（健康检查）
     lastEventTime = Date.now()
+
+    // 移除释放的鼠标按键
+    pressedMouseButtons.delete(event.button as number)
     handleButtonUp(event.button as number)
 
     // Left button (button 1) - hide Super Panel when clicking outside
@@ -610,6 +619,7 @@ export function stopGlobalMouseListener(): void {
     uIOhook.stop()
     isListening = false
     activeModifiers.clear()
+    pressedMouseButtons.clear()
     cancelLongPress()
     console.log('Global mouse listener stopped')
   } catch (error) {
@@ -666,8 +676,17 @@ export function restartGlobalMouseListener(): void {
  */
 export function clearModifierStates(): void {
   activeModifiers.clear()
+  pressedMouseButtons.clear()
   cancelLongPress()
   console.log('[MouseListener] Modifier states cleared')
+}
+
+/**
+ * Check if any mouse button is currently pressed
+ * 用于判断是否处于拖拽窗口等鼠标按压状态
+ */
+export function isAnyMouseButtonPressed(): boolean {
+  return pressedMouseButtons.size > 0
 }
 
 /**

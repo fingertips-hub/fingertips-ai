@@ -2,6 +2,7 @@ import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../../resources/icon.png?asset'
+import { isAnyMouseButtonPressed } from './mouseListener'
 
 /**
  * Dynamic Island Window Manager
@@ -10,6 +11,19 @@ import icon from '../../../resources/icon.png?asset'
 
 // 灵动岛窗口实例
 let dynamicIslandWindow: BrowserWindow | null = null
+
+// 鼠标位置检测定时器
+let mousePositionTimer: NodeJS.Timeout | null = null
+
+// 当前是否启用了 forward 模式（用于避免重复设置）
+let isForwardEnabled = false
+
+// 当前是否处于交互模式（渲染进程显式禁用了穿透）
+// 当处于交互模式时，主进程的轮询检测不应该改变穿透状态
+let isInteractionMode = false
+
+// 鼠标检测轮询间隔（毫秒）
+const MOUSE_CHECK_INTERVAL = 50
 
 // 窗口配置
 const COLLAPSED_CONFIG = {
@@ -75,9 +89,11 @@ export function createDynamicIslandWindow(): BrowserWindow {
     }
   })
 
-  // 始终启用鼠标穿透，内容区域通过 CSS pointer-events 控制交互
-  // forward: true 表示鼠标事件会转发到下方窗口，除非被 CSS pointer-events: auto 的元素捕获
-  window.setIgnoreMouseEvents(true, { forward: true })
+  // 默认启用鼠标穿透，不使用 forward 模式
+  // 这样可以避免 Electron Bug #35030：forward: true 会导致其他有边框窗口在移动时闪烁
+  // 通过主进程轮询检测鼠标位置，按需启用 forward 模式
+  window.setIgnoreMouseEvents(true)
+  isForwardEnabled = false
 
   // 隐藏菜单栏
   window.setMenuBarVisibility(false)
@@ -88,8 +104,9 @@ export function createDynamicIslandWindow(): BrowserWindow {
     window.show()
   })
 
-  // 清理引用
+  // 清理引用和定时器
   window.on('closed', () => {
+    stopMousePositionDetection()
     dynamicIslandWindow = null
   })
 
@@ -116,9 +133,13 @@ export function showDynamicIslandWindow(): void {
   if (dynamicIslandWindow && !dynamicIslandWindow.isDestroyed()) {
     if (!dynamicIslandWindow.isVisible()) {
       dynamicIslandWindow.show()
+      // 启动鼠标位置检测
+      startMousePositionDetection()
     }
   } else {
     createDynamicIslandWindow()
+    // 启动鼠标位置检测
+    startMousePositionDetection()
   }
 }
 
@@ -128,6 +149,8 @@ export function showDynamicIslandWindow(): void {
 export function hideDynamicIslandWindow(): void {
   if (dynamicIslandWindow && !dynamicIslandWindow.isDestroyed()) {
     dynamicIslandWindow.hide()
+    // 停止鼠标位置检测
+    stopMousePositionDetection()
   }
 }
 
@@ -135,6 +158,9 @@ export function hideDynamicIslandWindow(): void {
  * 关闭灵动岛窗口
  */
 export function closeDynamicIslandWindow(): void {
+  // 停止鼠标位置检测
+  stopMousePositionDetection()
+  
   if (dynamicIslandWindow && !dynamicIslandWindow.isDestroyed()) {
     dynamicIslandWindow.close()
   }
@@ -185,19 +211,109 @@ export function collapseDynamicIsland(): void {
 
 /**
  * 设置鼠标事件穿透
+ * @param ignore 是否忽略鼠标事件
+ * @param options.forward 是否启用 forward 模式（仅在 ignore=true 时有效）
  */
-export function setDynamicIslandIgnoreMouseEvents(ignore: boolean): void {
+export function setDynamicIslandIgnoreMouseEvents(
+  ignore: boolean,
+  options?: { forward?: boolean }
+): void {
   if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
     return
   }
 
   if (ignore) {
-    // 启用穿透，允许点击下方内容
-    dynamicIslandWindow.setIgnoreMouseEvents(true, { forward: true })
+    // 退出交互模式
+    isInteractionMode = false
+    
+    if (options?.forward) {
+      // 启用穿透 + forward 模式（允许检测鼠标移动）
+      dynamicIslandWindow.setIgnoreMouseEvents(true, { forward: true })
+      isForwardEnabled = true
+    } else {
+      // 启用穿透，完全忽略鼠标事件（避免闪烁问题）
+      dynamicIslandWindow.setIgnoreMouseEvents(true)
+      isForwardEnabled = false
+    }
   } else {
     // 禁用穿透，让窗口接收鼠标事件
+    // 进入交互模式，主进程轮询不应该干扰
+    isInteractionMode = true
     dynamicIslandWindow.setIgnoreMouseEvents(false)
+    isForwardEnabled = false
   }
+}
+
+/**
+ * 启动鼠标位置检测
+ * 通过轮询检测鼠标是否在灵动岛窗口区域内，按需启用 forward 模式
+ * 这样可以避免 Electron Bug #35030：forward: true 会导致其他有边框窗口闪烁
+ */
+function startMousePositionDetection(): void {
+  // 避免重复启动
+  if (mousePositionTimer) {
+    return
+  }
+
+  mousePositionTimer = setInterval(() => {
+    if (!dynamicIslandWindow || dynamicIslandWindow.isDestroyed()) {
+      stopMousePositionDetection()
+      return
+    }
+
+    // 获取鼠标位置和窗口边界
+    const cursorPoint = screen.getCursorScreenPoint()
+    const windowBounds = dynamicIslandWindow.getBounds()
+
+    // 检测鼠标是否在窗口区域内
+    const isMouseInWindow =
+      cursorPoint.x >= windowBounds.x &&
+      cursorPoint.x <= windowBounds.x + windowBounds.width &&
+      cursorPoint.y >= windowBounds.y &&
+      cursorPoint.y <= windowBounds.y + windowBounds.height
+
+    // 如果处于交互模式，不要改变穿透状态
+    if (isInteractionMode) {
+      return
+    }
+
+    // 当任意鼠标按键处于按下状态时（例如拖拽其他窗口），强制禁用 forward 模式
+    // 这是规避 Electron Bug #35030 的关键：forward: true 会导致其他有边框窗口在拖拽时闪烁
+    if (isAnyMouseButtonPressed()) {
+      if (isForwardEnabled) {
+        dynamicIslandWindow.setIgnoreMouseEvents(true)
+        isForwardEnabled = false
+      }
+      return
+    }
+
+    // 根据鼠标位置切换 forward 模式
+    if (isMouseInWindow && !isForwardEnabled) {
+      // 鼠标进入窗口区域，启用 forward 模式以检测精确的鼠标事件
+      dynamicIslandWindow.setIgnoreMouseEvents(true, { forward: true })
+      isForwardEnabled = true
+      
+      // 通知渲染进程检查鼠标位置
+      // 这是为了解决 mouseenter 事件可能不触发的问题（当 forward 模式刚启用时）
+      dynamicIslandWindow.webContents.send('dynamic-island:mouse-entered-window')
+    } else if (!isMouseInWindow && isForwardEnabled) {
+      // 鼠标离开窗口区域，禁用 forward 模式以避免闪烁
+      dynamicIslandWindow.setIgnoreMouseEvents(true)
+      isForwardEnabled = false
+    }
+  }, MOUSE_CHECK_INTERVAL)
+}
+
+/**
+ * 停止鼠标位置检测
+ */
+function stopMousePositionDetection(): void {
+  if (mousePositionTimer) {
+    clearInterval(mousePositionTimer)
+    mousePositionTimer = null
+  }
+  isForwardEnabled = false
+  isInteractionMode = false
 }
 
 /**

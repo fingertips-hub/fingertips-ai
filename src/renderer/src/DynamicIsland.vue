@@ -261,6 +261,44 @@ function handleMouseEnter(): void {
 }
 
 /**
+ * 主动检查鼠标是否在可交互元素上
+ * 当主进程启用 forward 模式时调用，解决 mouseenter 事件可能不触发的问题
+ */
+function checkMousePosition(): void {
+  // 检查是否有元素在 .dynamic-island 内部
+  const islandElement = islandRef.value
+  if (!islandElement) return
+  
+  // 获取灵动岛的边界
+  const islandRect = islandElement.getBoundingClientRect()
+  
+  // 检查鼠标是否在灵动岛可见区域内（通过监听 mousemove 事件获取实时位置）
+  // 由于我们无法直接获取鼠标位置，使用一个临时的 mousemove 监听器
+  const onMouseMove = (e: MouseEvent): void => {
+    document.removeEventListener('mousemove', onMouseMove)
+    
+    // 检查鼠标是否在灵动岛可见区域内
+    if (
+      e.clientX >= islandRect.left &&
+      e.clientX <= islandRect.right &&
+      e.clientY >= islandRect.top &&
+      e.clientY <= islandRect.bottom
+    ) {
+      // 鼠标在灵动岛上，禁用穿透
+      handleMouseEnter()
+    }
+  }
+  
+  // 添加临时监听器，等待下一次鼠标移动
+  document.addEventListener('mousemove', onMouseMove, { once: true })
+  
+  // 如果 100ms 内没有 mousemove，移除监听器
+  setTimeout(() => {
+    document.removeEventListener('mousemove', onMouseMove)
+  }, 100)
+}
+
+/**
  * 鼠标离开灵动岛 - 启用穿透让下方可点击
  */
 function handleMouseLeave(): void {
@@ -948,6 +986,14 @@ onMounted(() => {
       loadExpandedWidgets()
     }, 0)
   }
+  
+  // 监听主进程的鼠标进入窗口通知
+  // 当主进程检测到鼠标进入窗口区域并启用 forward 模式时，主动检查鼠标位置
+  if (window.api?.dynamicIsland?.onMouseEnteredWindow) {
+    window.api.dynamicIsland.onMouseEnteredWindow(() => {
+      checkMousePosition()
+    })
+  }
 })
 
 /**
@@ -955,6 +1001,11 @@ onMounted(() => {
  */
 onUnmounted(() => {
   stopWidgetUpdate()
+  
+  // 移除鼠标进入窗口的监听器
+  if (window.api?.dynamicIsland?.removeMouseEnteredWindowListener) {
+    window.api.dynamicIsland.removeMouseEnteredWindowListener()
+  }
 })
 </script>
 

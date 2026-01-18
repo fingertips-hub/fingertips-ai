@@ -292,6 +292,7 @@ export function createPluginAPI(manifest: PluginManifest): PluginAPI {
     handle(channel: string, handler: (event: any, ...args: any[]) => any) {
       // 确保 channel 以插件 ID 为前缀，避免命名冲突
       const prefixedChannel = `plugin:${manifest.id}:${channel}`
+      ipcMain.removeHandler(prefixedChannel)
       ipcMain.handle(prefixedChannel, handler)
     },
 

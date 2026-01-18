@@ -274,7 +274,16 @@ const api = {
     close: () => ipcRenderer.send('dynamic-island:close'),
     // 设置鼠标穿透状态
     setIgnoreMouseEvents: (ignore: boolean) =>
-      ipcRenderer.send('dynamic-island:set-ignore-mouse-events', ignore)
+      ipcRenderer.send('dynamic-island:set-ignore-mouse-events', ignore),
+    // 监听鼠标进入窗口区域的通知（用于主动检查鼠标位置）
+    onMouseEnteredWindow: (callback: () => void) => {
+      ipcRenderer.removeAllListeners('dynamic-island:mouse-entered-window')
+      ipcRenderer.on('dynamic-island:mouse-entered-window', () => callback())
+    },
+    // 移除鼠标进入窗口区域的监听器
+    removeMouseEnteredWindowListener: () => {
+      ipcRenderer.removeAllListeners('dynamic-island:mouse-entered-window')
+    }
   },
   // Dynamic Island Widget 相关API
   dynamicIslandWidget: {

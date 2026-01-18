@@ -24,6 +24,12 @@ export interface PluginManifest {
   activated?: boolean
 }
 
+type PluginDetails = {
+  manifest: PluginManifest
+  enabled: boolean
+  activated: boolean
+}
+
 /**
  * 插件 Store
  * 管理插件列表、配置和操作
@@ -121,6 +127,11 @@ export const usePluginStore = defineStore('plugin', () => {
         if (plugin) {
           plugin.enabled = enabled
           plugin.activated = enabled
+        }
+
+        // 如果插件不在本地列表中（例如仅加载过 enabledPlugins），刷新一次完整列表以保证状态一致
+        if (!plugin) {
+          await loadPlugins(true)
         }
 
         // 静默加载启用的插件列表（不触发 loading 状态，避免滚动位置丢失）
@@ -249,7 +260,22 @@ export const usePluginStore = defineStore('plugin', () => {
       const result = await window.api.plugin.getDetails(pluginId)
 
       if (result.success) {
-        return result.data
+        // 将最新状态合并进 plugins，保证其他入口（如 Super Panel）读取到一致的 activated/enabled
+        const details = result.data as unknown as PluginDetails
+        const merged: PluginManifest = {
+          ...details.manifest,
+          enabled: details.enabled,
+          activated: details.activated
+        }
+
+        const existing = plugins.value.find((p) => p.id === pluginId)
+        if (existing) {
+          Object.assign(existing, merged)
+        } else {
+          plugins.value.push(merged)
+        }
+
+        return merged
       } else {
         throw new Error(result.error || 'Failed to get plugin details')
       }

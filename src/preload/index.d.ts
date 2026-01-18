@@ -243,6 +243,8 @@ interface API {
     hide: () => void
     close: () => void
     setIgnoreMouseEvents: (ignore: boolean) => void
+    onMouseEnteredWindow: (callback: () => void) => void
+    removeMouseEnteredWindowListener: () => void
   }
   dynamicIslandWidget: {
     getAll: () => Promise<any[]>
