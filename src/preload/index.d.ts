@@ -234,6 +234,17 @@ interface API {
       }
       error?: string
     }>
+    getDirectory: () => Promise<{
+      success: boolean
+      data?: {
+        directory: string
+      }
+      error?: string
+    }>
+    openDirectory: () => Promise<{
+      success: boolean
+      error?: string
+    }>
     invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
   }
   dynamicIsland: {

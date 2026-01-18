@@ -1,6 +1,6 @@
 {
   "name": "fingertips-ai",
-  "version": "0.0.14",
+  "version": "1.0.0",
   "description": "Fingertips AI",
   "main": "./out/main/index.js",
   "author": "Fingertips Hub",

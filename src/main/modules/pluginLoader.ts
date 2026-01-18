@@ -59,11 +59,13 @@ export async function scanPlugins(): Promise<PluginManifest[]> {
         const manifest = JSON.parse(manifestContent) as PluginManifest
 
         // 验证插件
-        if (validateManifest(manifest, pluginPath)) {
+        const validation = validateManifest(manifest, pluginPath)
+        if (validation.valid) {
           manifests.push(manifest)
           console.log(`Found plugin: ${manifest.name} (${manifest.id})`)
         } else {
           console.warn(`Invalid plugin manifest: ${pluginPath}`)
+          console.warn(validation.errors.join('\n'))
         }
       } catch (error) {
         console.error(`Failed to load plugin from ${pluginPath}:`, error)
@@ -80,80 +82,97 @@ export async function scanPlugins(): Promise<PluginManifest[]> {
 /**
  * 验证插件清单
  */
-export function validateManifest(manifest: PluginManifest, pluginPath: string): boolean {
+export function validateManifest(
+  manifest: PluginManifest,
+  pluginPath: string
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+
   // 检查必需字段
   if (!manifest.id || typeof manifest.id !== 'string') {
-    console.error(`Plugin at ${pluginPath}: Missing or invalid 'id'`)
-    return false
+    errors.push(`Plugin at ${pluginPath}: Missing or invalid 'id'`)
   }
 
   if (!manifest.name || typeof manifest.name !== 'string') {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'name'`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'name'`)
   }
 
   if (!manifest.version || typeof manifest.version !== 'string') {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'version'`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'version'`)
   }
 
   if (!manifest.description || typeof manifest.description !== 'string') {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'description'`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'description'`)
   }
 
   if (!Array.isArray(manifest.keywords) || manifest.keywords.length === 0) {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'keywords' array (must be non-empty)`)
-    return false
-  }
-
-  if (!manifest.keywords.every((k) => typeof k === 'string')) {
-    console.error(`Plugin ${manifest.id}: Invalid 'keywords' - all items must be strings`)
-    return false
+    errors.push(
+      `Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'keywords' array (must be non-empty)`
+    )
+  } else if (!manifest.keywords.every((k) => typeof k === 'string')) {
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Invalid 'keywords' - all items must be strings`)
   }
 
   if (!manifest.main || typeof manifest.main !== 'string') {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'main' entry point`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'main' entry point`)
   }
 
   if (!manifest.fingertips || !manifest.fingertips.minVersion) {
-    console.error(`Plugin ${manifest.id}: Missing 'fingertips.minVersion'`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing 'fingertips.minVersion'`)
   }
 
   if (!Array.isArray(manifest.permissions)) {
-    console.error(`Plugin ${manifest.id}: Missing or invalid 'permissions' array`)
-    return false
+    errors.push(`Plugin ${manifest.id || '(unknown)'}: Missing or invalid 'permissions' array`)
   }
 
   // 验证版本兼容性
-  if (!isVersionCompatible(manifest)) {
-    console.error(`Plugin ${manifest.id}: Version incompatible with current app version`)
-    return false
+  const versionCompatibility = checkVersionCompatibility(manifest)
+  if (!versionCompatibility.compatible) {
+    errors.push(versionCompatibility.reason)
   }
 
-  return true
+  const valid = errors.length === 0
+  if (!valid) {
+    for (const err of errors) {
+      console.error(err)
+    }
+  }
+
+  return { valid, errors }
 }
 
 /**
  * 验证版本兼容性
  */
-function isVersionCompatible(manifest: PluginManifest): boolean {
+function checkVersionCompatibility(manifest: PluginManifest): { compatible: boolean; reason: string } {
   const appVersion = app.getVersion()
-  const minVersion = manifest.fingertips.minVersion
-  const maxVersion = manifest.fingertips.maxVersion
+
+  const minVersion = manifest.fingertips?.minVersion
+  const maxVersion = manifest.fingertips?.maxVersion
+
+  if (!minVersion) {
+    return {
+      compatible: false,
+      reason: `Plugin ${manifest.id || '(unknown)'}: Missing 'fingertips.minVersion'`
+    }
+  }
 
   // 简单的版本比较（实际应用中应使用 semver 库）
   if (compareVersion(appVersion, minVersion) < 0) {
-    return false
+    return {
+      compatible: false,
+      reason: `Plugin ${manifest.id || '(unknown)'}: Version incompatible (app=${appVersion}, min=${minVersion})`
+    }
   }
 
   if (maxVersion && compareVersion(appVersion, maxVersion) > 0) {
-    return false
+    return {
+      compatible: false,
+      reason: `Plugin ${manifest.id || '(unknown)'}: Version incompatible (app=${appVersion}, max=${maxVersion})`
+    }
   }
 
-  return true
+  return { compatible: true, reason: '' }
 }
 
 /**
@@ -434,8 +453,9 @@ async function validatePluginPackage(extractedPath: string): Promise<PluginManif
     const manifest = JSON.parse(manifestContent) as PluginManifest
 
     // 验证插件清单
-    if (!validateManifest(manifest, pluginRoot)) {
-      throw new Error('插件清单验证失败，请检查必填字段')
+    const validation = validateManifest(manifest, pluginRoot)
+    if (!validation.valid) {
+      throw new Error(`插件清单验证失败: ${validation.errors.join('；')}`)
     }
 
     // 验证主入口文件是否存在

@@ -1,7 +1,13 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { pluginManager } from './pluginManager'
 import { getPluginConfig, setPluginConfig } from './pluginStore'
-import { installPluginFromZip, uninstallPlugin, updatePlugin } from './pluginLoader'
+import {
+  installPluginFromZip,
+  uninstallPlugin,
+  updatePlugin,
+  getPluginsDirectory,
+  ensurePluginsDirectory
+} from './pluginLoader'
 
 /**
  * 插件 IPC 处理器
@@ -168,6 +174,34 @@ export function setupPluginHandlers(): void {
   })
 
   /**
+   * 获取插件目录路径
+   */
+  ipcMain.handle('plugin:get-directory', async () => {
+    try {
+      await ensurePluginsDirectory()
+      return { success: true, data: { directory: getPluginsDirectory() } }
+    } catch (error) {
+      console.error('Failed to get plugins directory:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  /**
+   * 打开插件目录
+   */
+  ipcMain.handle('plugin:open-directory', async () => {
+    try {
+      await ensurePluginsDirectory()
+      const dir = getPluginsDirectory()
+      await shell.openPath(dir)
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to open plugins directory:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  /**
    * 卸载插件
    */
   ipcMain.handle('plugin:uninstall', async (_event, pluginId: string) => {
@@ -302,6 +336,8 @@ export function cleanupPluginHandlers(): void {
   ipcMain.removeHandler('plugin:uninstall')
   ipcMain.removeHandler('plugin:update')
   ipcMain.removeHandler('plugin:rescan')
+  ipcMain.removeHandler('plugin:get-directory')
+  ipcMain.removeHandler('plugin:open-directory')
 
   console.log('Plugin IPC handlers cleaned up')
 }

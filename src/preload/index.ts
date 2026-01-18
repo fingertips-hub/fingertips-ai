@@ -251,6 +251,10 @@ const api = {
       ipcRenderer.invoke('plugin:update', pluginId, zipPath),
     // 重新扫描插件目录（热重载）
     rescan: () => ipcRenderer.invoke('plugin:rescan'),
+    // 获取插件目录
+    getDirectory: () => ipcRenderer.invoke('plugin:get-directory'),
+    // 打开插件目录
+    openDirectory: () => ipcRenderer.invoke('plugin:open-directory'),
     // 调用插件的 IPC 处理器
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     invoke: (channel: string, ...args: any[]) => {
